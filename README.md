@@ -1,7 +1,7 @@
 # SHUMZU 
 ## Secure storage, transmission and reconstruction
 
-            ### Whitepaper
+               Whitepaper
 
 #### Abstract
 
