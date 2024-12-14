@@ -1,4 +1,7 @@
-### SHZ3QR Whitepaper: Secure File Storage and Transmission via QR Code Blockchain Integration
+# SHUMZU 
+# Secure storage, transmission and reconstruction of text files
+
+### Whitepaper:
 
 #### Abstract
 
