@@ -1,5 +1,5 @@
 # SHUMZU 
-## Secure storage, transmission and reconstruction of text files
+## Secure storage, transmission and reconstruction
 
 ### Whitepaper:
 
