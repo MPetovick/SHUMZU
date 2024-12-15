@@ -1,4 +1,4 @@
- ![SHUMZUlogo](/logo_SHUMZU.png)  ![SHUMZUlogo](/logo_SHUMZU.png)  ![SHUMZUlogo](/logo_SHUMZU.png)   ![SHUMZUlogo](/logo_SHUMZU.png)   ![SHUMZUlogo](/logo_SHUMZU.png)   ![SHUMZUlogo](/logo_SHUMZU.png)   ![SHUMZUlogo](/logo_SHUMZU.png)
+ ![SHUMZUlogo](/logo_SHUMZU.png)  ![SHUMZUlogo](/logo_SHUMZU.png)  ![SHUMZUlogo](/logo_SHUMZU.png)   ![SHUMZUlogo](/logo_SHUMZU.png)   ![SHUMZUlogo](/logo_SHUMZU.png)   ![SHUMZUlogo](/logo_SHUMZU.png)   ![SHUMZUlogo](/logo_SHUMZU.png)   ![SHUMZUlogo](/logo_SHUMZU.png)   ![SHUMZUlogo](/logo_SHUMZU.png)
 # SHUMZU - Secure storage, transmission and reconstruction
 
 ### Whitepaper
