@@ -102,5 +102,5 @@ As digital security concerns continue to rise, this system offers a practical so
 
 ---
 
-[SHUMZHU_SHZverified](v01/SHUMZU_SHZverified.pdf).
+[SHUMZU_SHZverified](v01/SHUMZU_SHZverified.pdf).
 ![SHUMZUv01](/v01/SHUMZUv1.png) 
