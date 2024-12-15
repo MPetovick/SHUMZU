@@ -99,3 +99,5 @@ This whitepaper discusses the potential real-world applications of this technolo
 The integration of **QR codes**, **blockchain**, and **encryption** offers a highly secure, efficient, and decentralized method for file storage and transmission. The system provides significant potential for secure document sharing, disaster recovery, file integrity verification, and decentralized storage. By combining these technologies, users can ensure that their sensitive files are protected, tamper-proof, and easily recoverable.
 
 As digital security concerns continue to rise, this system offers a practical solution for maintaining data privacy, integrity, and availability in an increasingly connected world.
+
+![SHUMZUv01](/v01/SHUMZUv1.png) 
