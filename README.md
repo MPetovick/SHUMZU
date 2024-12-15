@@ -109,3 +109,5 @@ As digital security concerns continue to rise, this system offers a practical so
 ## Donations
 BTC:
 `bc1qcpmpwcyd2dx57wmzx0fhnerupqv9sla6jemg4p`
+TON:
+`UQDxsYGL5HSUnBgIKiT5hXzj-OKJDIBT640YoMIjTTVB4sRB`
