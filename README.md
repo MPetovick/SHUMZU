@@ -1,4 +1,4 @@
-# SHUMZU - storage, transmission and reconstruction
+# SHUMZU -  storage, transmission and reconstruction
  ![SHUMZUlogo](/logo_SHUMZU.png)  ![SHUMZUlogo](/logo_SHUMZU.png)  ![SHUMZUlogo](/logo_SHUMZU.png)   ![SHUMZUlogo](/logo_SHUMZU.png)   ![SHUMZUlogo](/logo_SHUMZU.png)   ![SHUMZUlogo](/logo_SHUMZU.png)   ![SHUMZUlogo](/logo_SHUMZU.png)   ![SHUMZUlogo](/logo_SHUMZU.png)   ![SHUMZUlogo](/logo_SHUMZU.png)
 #
 ### Whitepaper
