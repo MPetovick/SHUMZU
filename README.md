@@ -106,6 +106,6 @@ As digital security concerns continue to rise, this system offers a practical so
 ![SHUMZUv01](/v01/SHUMZUv1.png) 
 
 ---
-## Bitcoin Wallet
-Envía pagos a esta dirección BTC:
+## Donations
+BTC:
 `bc1qcpmpwcyd2dx57wmzx0fhnerupqv9sla6jemg4p`
