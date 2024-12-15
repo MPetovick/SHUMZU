@@ -104,3 +104,8 @@ As digital security concerns continue to rise, this system offers a practical so
 
 [SHUMZU_SHZverified](v01/SHUMZU_SHZverified.pdf).
 ![SHUMZUv01](/v01/SHUMZUv1.png) 
+
+---
+## Bitcoin Wallet
+Envía pagos a esta dirección BTC:
+`bc1qcpmpwcyd2dx57wmzx0fhnerupqv9sla6jemg4p`
