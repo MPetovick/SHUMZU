@@ -1,4 +1,4 @@
-![SHUMZUlogo](/v01/logo_SHUMZU.png)# SHUMZU 
+# ![SHUMZUlogo](/logo_SHUMZU.png) SHUMZU 
 ## Secure storage, transmission and reconstruction
 
 ### Whitepaper
