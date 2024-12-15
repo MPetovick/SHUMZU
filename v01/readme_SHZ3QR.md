@@ -1,6 +1,16 @@
 
 ### **SHZ3QR.py USER MANUAL**
 
+## Requirements
+
+Install dependencies with:
+
+```bash
+pip install -r requirements.txt
+```
+
+---
+
 ### **Commands:**
 
 #### **1. Generate a Secret Key**
