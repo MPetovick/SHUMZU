@@ -1,5 +1,5 @@
 
-### **SHZ3QR.py USER MANUAL**
+# **SHZ3QR USER MANUAL**
 
 ## Requirements
 
