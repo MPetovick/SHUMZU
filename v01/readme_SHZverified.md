@@ -1,4 +1,4 @@
-# QR Hash Generator - User Manual
+# SHZverified - User Manual
 
 ## What Does It Do?
 
