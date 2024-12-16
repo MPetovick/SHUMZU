@@ -6,3 +6,4 @@ tqdm==4.65.0
 argparse==1.4.0
 hashlib==0.2
 fpdf==1.7.2
+zbar==0.10
