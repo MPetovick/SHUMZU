@@ -1,5 +1,5 @@
 
-# **SHZ3QR - User Manual
+# **SHZ3QR - User Manual**
 
 ## Requirements
 
