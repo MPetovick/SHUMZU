@@ -111,4 +111,4 @@ BTC:
 `bc1qcpmpwcyd2dx57wmzx0fhnerupqv9sla6jemg4p`
 
 TON:
-`UQDxsYGL5HSUnBgIKiT5hXzj-OKJDIBT640YoMIjTTVB4sRB`
+`UQAbBeF6AOYu1mdDYpDboUDD8BZeZtJocMEd9M3HDYxvxWEM`
