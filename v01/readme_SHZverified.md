@@ -35,7 +35,7 @@ python SHZverified.py -i keymaster.png
 ```
 
 This will:
-1. Extract QR codes from `qr_image.png`.
+1. Extract QR codes from `keymaster.png`.
 2. Generate SHA3-256 hashes.
 3. Create a PDF with the QR content, hash, and image.
 
