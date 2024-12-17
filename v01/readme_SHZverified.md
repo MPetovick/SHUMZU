@@ -22,7 +22,7 @@ pip install -r requirements.txt
 ### Step 1: Run the Script
 
 ```bash
-python qr_hash_generator.py -i <image_path>
+python SHZverified.py -i <image_path>
 ```
 
 ### Arguments:
