@@ -31,7 +31,7 @@ python qr_hash_generator.py -i <image_path>
 ### Example:
 
 ```bash
-python qr_hash_generator.py -i qr_image.png
+python SHZverified.py -i keymaster.png
 ```
 
 This will:
