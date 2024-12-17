@@ -162,7 +162,7 @@ class QRCodeHandler:
                 'hash': hash_value,
                 'block_number': block_number,
             }
-            if file_name and block_number == 1:
+            if file_name and block_number == 0:
                 qr_data['file_name'] = file_name
             if file_extension and block_number == 0:
                 qr_data['file_extension'] = file_extension
