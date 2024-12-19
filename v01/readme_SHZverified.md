@@ -2,7 +2,7 @@
 
 ## What Does It Do?
 
-This script reads QR codes from an keymaster, generates their SHA3-256 hashes, and creates a PDF report with:
+This script reads QR codes from a keymaster, generates their SHA3-256 hashes, and creates a PDF report with:
 
 1. A table of QR content and their corresponding hashes.
 2. The QR code image for reference.
