@@ -18,14 +18,14 @@ Before splitting or reconstructing files, generate a secret key. This key is use
 
 **Command:**
 ```bash
-python script.py --generate-key -p <password>
+python SHZ3QR.py --generate-key -p <password>
 ```
 - `--generate-key`: Creates a new secret key.
 - `-p` or `--password`: Password used to encrypt the secret key.
 
 **Example:**
 ```bash
-python script.py --generate-key -p mySecurePassword123
+python SHZ3QR.py --generate-key -p mySecurePassword123
 ```
 
 ---
@@ -35,7 +35,7 @@ Once you have the secret key, split a file into QR code blocks. You can choose t
 
 **Command:**
 ```bash
-python script.py -f <file_to_split> -p <password> --output <output_directory> [--encrypt]
+python SHZ3QR.py -f <file_to_split> -p <password> --output <output_directory> [--encrypt]
 ```
 - `-f` or `--file`: File to split into QR blocks.
 - `-p` or `--password`: Password for encrypting the QR blocks.
@@ -44,12 +44,12 @@ python script.py -f <file_to_split> -p <password> --output <output_directory> [-
 
 **Example (no encryption):**
 ```bash
-python script.py -f myfile.pdf -p mySecurePassword123 --output ./output
+python SHZ3QR.py -f myfile.pdf -p mySecurePassword123 --output ./output
 ```
 
 **Example (with encryption):**
 ```bash
-python script.py -f myfile.pdf -p mySecurePassword123 --output ./output --encrypt
+python SHZ3QR.py -f myfile.pdf -p mySecurePassword123 --output ./output --encrypt
 ```
 
 ---
@@ -59,7 +59,7 @@ Reconstruct a file from an encrypted or unencrypted QR code matrix.
 
 **Command:**
 ```bash
-python script.py -r <keymaster.png> -p <password> [--decrypt]
+python SHZ3QR.py -r <keymaster.png> -p <password> [--decrypt]
 ```
 - `-r` or `--keymaster`: Path to the QR code matrix.
 - `-p` or `--password`: Password for decrypting the matrix.
@@ -67,7 +67,7 @@ python script.py -r <keymaster.png> -p <password> [--decrypt]
 
 **Example (with decryption):**
 ```bash
-python script.py -r keymaster.png -p mySecurePassword123 --decrypt
+python SHZ3QR.py -r keymaster.png -p mySecurePassword123 --decrypt
 ```
 
 ---
@@ -77,19 +77,19 @@ python script.py -r keymaster.png -p mySecurePassword123 --decrypt
 1. **Generate a Secret Key:**
    - Run the command to create a secret key with a secure password.
    ```bash
-   python script.py --generate-key -p mySecurePassword123
+   python SHZ3QR.py --generate-key -p mySecurePassword123
    ```
 
 2. **Split the File:**
    - Split the file into QR code blocks. Choose whether to encrypt the blocks.
    ```bash
-   python script.py -f mydocument.txt -p mySecurePassword123 --output ./qr_blocks --encrypt
+   python SHZ3QR.py -f mydocument.txt -p mySecurePassword123 --output ./qr_blocks --encrypt
    ```
 
 3. **Reconstruct the File:**
    - Reconstruct the file from the QR code matrix, and decrypt it if needed.
    ```bash
-   python script.py -r ./qr_blocks/keymaster.png -p mySecurePassword123 --decrypt
+   python SHZ3QR.py -r ./qr_blocks/keymaster.png -p mySecurePassword123 --decrypt
    ```
 
 ---
