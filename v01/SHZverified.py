@@ -109,7 +109,7 @@ def create_pdf(data, image_path, output_pdf_path):
     # Añadir pie de página con la fecha de creación
     pdf.set_y(-15)
     pdf.set_font("Arial", "I", 8)
-    pdf.cell(0, 10, txt="Creado por MikePetovick", align="C")
+    pdf.cell(0, 10, txt="SHUMZU 2024", align="C")
 
     # Guardar el PDF
     pdf.output(output_pdf_path)
@@ -131,7 +131,7 @@ def main():
     if qr_hashes:
         # Generar un nombre de archivo único basado en la fecha y hora
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        pdf_filename = f"qr_hashes_{timestamp}.pdf"
+        pdf_filename = f"SHZverified_{timestamp}.pdf"
 
         # Crear el PDF sin protección primero
         create_pdf(qr_hashes, args.image, pdf_filename)
