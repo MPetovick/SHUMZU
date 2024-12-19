@@ -70,6 +70,10 @@ def create_pdf(data, image_path, output_pdf_path):
     # Establecer título y estilo de la fuente
     pdf.set_font("Arial", size=16, style='B')
     pdf.cell(200, 10, txt="Ficha Técnica de los Códigos QR", ln=True, align="C")
+
+    # Añadir timestamp debajo del título
+    pdf.set_font("Arial", size=10, style='I')
+    pdf.cell(200, 10, txt=f"Generado el: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", ln=True, align="C")
     pdf.ln(10)  # Salto de línea
 
     # Establecer fuente para el contenido
@@ -96,8 +100,8 @@ def create_pdf(data, image_path, output_pdf_path):
 
     # Ajustar la imagen QR al tamaño del PDF
     try:
-        pdf.image(image_path, x=10, y=pdf.get_y(), w=100)  # Ajustar el tamaño de la imagen
-        pdf.ln(110)  # Ajuste para evitar que se superponga
+        pdf.image(image_path, x=50, y=pdf.get_y(), w=80)  # Ajustar el tamaño y posición de la imagen
+        pdf.ln(90)  # Ajuste para evitar que se superponga
     except Exception as e:
         logging.error(f"Error al agregar la imagen: {e}")
         pdf.ln(10)  # Deja espacio si no se puede agregar la imagen
@@ -105,7 +109,7 @@ def create_pdf(data, image_path, output_pdf_path):
     # Añadir pie de página con la fecha de creación
     pdf.set_y(-15)
     pdf.set_font("Arial", "I", 8)
-    pdf.cell(0, 10, txt=f"Generado el: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", align="C")
+    pdf.cell(0, 10, txt="Creado por MikePetovick", align="C")
 
     # Guardar el PDF
     pdf.output(output_pdf_path)
@@ -139,3 +143,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
