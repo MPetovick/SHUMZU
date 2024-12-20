@@ -201,8 +201,7 @@ class QRCodeHandler:
         except Exception as e:
             logging.error(f"Error al validar imágenes QR: {e}")
             raise QRCodeError("Error al validar imágenes QR.")
-            
-
+          
     @staticmethod
     def decode_qr_matrix(keymaster_path):
         try:
@@ -298,7 +297,6 @@ class FileProcessor:
         logging.info(f"El tamaño dinámico del bloque es: {block_size} bytes")
         return block_size
         
-
     @staticmethod
     def split_data_into_qr_blocks(data, file_path=None, file_name=None, file_extension=None, target_blocks=100, max_qr_size=3000):
         """
@@ -334,7 +332,6 @@ class FileProcessor:
 
         logging.info(f"Se generaron {len(blocks)} bloques de datos.")
         return blocks
-
 
     @staticmethod
     def read_file_in_chunks(file_path, chunk_size=1024 * 1024):
@@ -409,8 +406,6 @@ class FileProcessor:
         except Exception as e:
             logging.error(f"Error al reconstruir el archivo: {e}")
             raise ValueError("Error al reconstruir el archivo.") from e
-
-
   
     @staticmethod
     def encrypt_file(file_path, secret_key, output_path=None):
@@ -474,7 +469,6 @@ class FileProcessor:
         except Exception as e:
             logging.error(f"Error al descifrar el archivo '{file_path}': {e}")
             raise FileProcessingError("Error al descifrar el archivo.")
-
 
 def main():
     parser = argparse.ArgumentParser(description="Divide un archivo en bloques QR o reconstruye un archivo desde una matriz QR protegida por contraseña.")
