@@ -328,7 +328,7 @@ class FileProcessor:
 
         # Asignar metadatos del archivo si se proporciona
         if len(blocks) > 1 and file_name:
-            blocks[1]['file_name'] = file_name
+            blocks[0]['file_name'] = file_name
         if len(blocks) > 0 and file_extension:
             blocks[0]['file_extension'] = file_extension
 
