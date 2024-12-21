@@ -31,7 +31,7 @@ python SHZ3QR.py --generate-key -p mySecurePassword123
 ---
 
 #### **2. Split a File into QR Code Blocks (Encrypted or Not)**
-Once you have the secret key, split a file into QR code blocks. You can choose to encrypt the blocks. Currently supports 500 pages.
+Once you have the secret key, split a file into QR code blocks. You can choose to encrypt the blocks.
 
 **Command:**
 ```bash
