@@ -1,14 +1,6 @@
  ![SHUMZUlogo](/logo_SHUMZU.png) ![SHUMZUlogo](/logo_SHUMZU.png) ![SHUMZUlogo](/logo_SHUMZU.png)  ![SHUMZUlogo](/logo_SHUMZU.png)  ![SHUMZUlogo](/logo_SHUMZU.png)  ![SHUMZUlogo](/logo_SHUMZU.png)  ![SHUMZUlogo](/logo_SHUMZU.png)  ![SHUMZUlogo](/logo_SHUMZU.png)  ![SHUMZUlogo](/logo_SHUMZU.png)
 SHUMZU modular  version 02
 #
-
-1. **Encryption and Decryption of Files**: The script can encrypt a file using a secret key derived from a password. It also supports decrypting the encrypted file.
-2. **Splitting Files into QR Codes**: A file can be split into QR code blocks. These QR codes can later be decoded to reconstruct the original file.
-3. **Reconstructing Files**: The script allows you to reconstruct a file from the QR codes, using a password to decrypt the secret key.
-4. **Blockchain Integration**: Each QR code block contains a blockchain hash to ensure integrity.
-
----
-
 ### **User Guide**
 
 This script has several command-line options for performing different tasks. Below is a list of the available commands and their functions.
