@@ -2,6 +2,8 @@ import os
 import base64
 import logging
 from PIL import Image
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+from cryptography.hazmat.backends import default_backend
 from exceptions import FileProcessingError
 
 Image.MAX_IMAGE_PIXELS = None  # Deshabilitar la protección de bombas de descompresión
@@ -29,7 +31,7 @@ class FileProcessor:
         if not blocks:
             raise ValueError("No se generaron bloques. Verifique el tamaño de los datos o el tamaño del bloque.")
 
-        if len(blocks) > 1 and file_name:
+        if len(blocks) > 0 and file_name:
             blocks[1]['file_name'] = file_name
         if len(blocks) > 0 and file_extension:
             blocks[0]['file_extension'] = file_extension
