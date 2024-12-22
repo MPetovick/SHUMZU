@@ -96,19 +96,6 @@ python SHZ3QR.py -r keymaster.png -p mySecurePassword123 --decrypt
 
 ---
 
-### **Considerations:**
-
-- **Password:** Use a strong password to ensure the encryption is secure.
-- **Encryption:** You can choose to encrypt the QR code blocks during the splitting process for added security.
-- **Decryption:** If the QR matrix is encrypted, you will need the password to decrypt it during reconstruction.
-
-### **Conclusion:**
-This tool offers a simple way to split and reconstruct files using QR codes, with optional encryption for added security. Ensure you store your password securely, as it is essential for encryption/decryption.
-
---- 
-
-This version focuses on the essential commands, options, and workflow for users to split and reconstruct files securely with QR codes.
-
 # SHZverified - User Manual
 
 ## What Does It Do?
