@@ -2,3 +2,52 @@
 SHUMZU modular  version 02
 #
 
+1. **Encryption and Decryption of Files**: The script can encrypt a file using a secret key derived from a password. It also supports decrypting the encrypted file.
+2. **Splitting Files into QR Codes**: A file can be split into QR code blocks. These QR codes can later be decoded to reconstruct the original file.
+3. **Reconstructing Files**: The script allows you to reconstruct a file from the QR codes, using a password to decrypt the secret key.
+4. **Blockchain Integration**: Each QR code block contains a blockchain hash to ensure integrity.
+
+---
+
+### **User Guide**
+
+This script has several command-line options for performing different tasks. Below is a list of the available commands and their functions.
+
+#### **Commands and Options**
+
+1. **Generate Secret Key**:
+   - **`--generate-key`**: Generate a new secret key. You need to provide a password with `--password` to encrypt the secret key.
+   - Example:  
+     ```bash
+     python main.py --generate-key -p <your_password>
+     ```
+
+2. **Encrypt a File**:
+   - **`--encrypt`**: Encrypt the file `keymaster.png` after generating it, using a password.
+   - Example:
+     ```bash
+     python main.py -f <file_to_encrypt> -p <your_password> --encrypt
+     ```
+
+3. **Decrypt a File**:
+   - **`--decrypt`**: Decrypt the file `keymaster.png` before using it (to recover the original data).
+   - Example:
+     ```bash
+     python main.py -r <keymaster.png> -p <your_password> --decrypt
+     ```
+
+4. **Splitting a File into QR Codes**:
+   - **`-f, --file`**: The file you want to split into QR code blocks.
+   - **`-o, --output`**: The directory where the generated QR code files will be saved.
+   - Example:
+     ```bash
+     python main.py -f <file_to_split> -p <your_password> -o <output_directory>
+     ```
+
+5. **Reconstruct a File from QR Codes**:
+   - **`-r, --keymaster`**: The path to the encrypted `keymaster.png` (QR code matrix).
+   - Example:
+     ```bash
+     python main.py -r <keymaster.png> -p <your_password> --decrypt
+     ```
+
