@@ -37,7 +37,7 @@ Once you have the secret key, split a file into QR code blocks. You can choose t
 ```bash
 python SHZ3QR.py -f <file_to_split> -p <password> --output <output_directory> [--encrypt]
 ```
-- `-f` or `--file`: File to split into QR blocks. (.txt .pdf .rtf)
+- `-f` or `--file`: File to split into QR blocks. (.txt .md .rtf)
 - `-p` or `--password`: Password for encrypting the QR blocks.
 - `--encrypt`: (Optional) Encrypt the QR blocks.
 - `--output`: (Optional) Directory to save QR blocks.
