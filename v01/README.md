@@ -1,10 +1,6 @@
  ![SHUMZUlogo](/logo_SHUMZU.png) ![SHUMZUlogo](/logo_SHUMZU.png) ![SHUMZUlogo](/logo_SHUMZU.png)  ![SHUMZUlogo](/logo_SHUMZU.png)  ![SHUMZUlogo](/logo_SHUMZU.png)  ![SHUMZUlogo](/logo_SHUMZU.png)  ![SHUMZUlogo](/logo_SHUMZU.png)  ![SHUMZUlogo](/logo_SHUMZU.png)  ![SHUMZUlogo](/logo_SHUMZU.png)
-### SHZ3QR & SHZverified
+SHZ3QR & SHZverified version 01
 #
-### SHZ3QR & SHZverified
-
-#### version 01
-
 # **SHZ3QR - User Manual**
 
 ## Requirements
