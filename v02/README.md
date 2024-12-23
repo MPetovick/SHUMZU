@@ -43,7 +43,7 @@ SHUMZU modular  version 02
 
 ### Goals
 
-- Increase the number of pages.  testing [23p/.txt]
+- Increase the number of pages.  testing [23p/txt] [-/doc] [-/rtf] [-/md] [-/pdf]
 - Add compatibility with other text formats.
 - Manipulate embedded images in files.
 - Add SHZverified
