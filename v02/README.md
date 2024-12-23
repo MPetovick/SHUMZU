@@ -42,4 +42,10 @@ This script has several command-line options for performing different tasks. Bel
      ```bash
      python main.py -r <keymaster.png> -p <your_password> --decrypt
      ```
+---
+
+### Goals
+
+- Increase the number of pages.
+- Add compatibility with other text formats.
 
