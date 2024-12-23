@@ -46,6 +46,7 @@ SHUMZU modular  version 02
 - Increase the number of pages.
 - Add compatibility with other text formats.
 - Manipulate embedded images in files.
+- Add SHZverified
 
 ### Bug Fixes v01
 
