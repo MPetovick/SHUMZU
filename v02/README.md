@@ -47,4 +47,9 @@ SHUMZU modular  version 02
 - Add compatibility with other text formats.
 - Manipulate embedded images in files.
 
+### Bug Fixes v01
+
+- Compatibility with other formats (embedded images causing errors).
+- Fixed errors in file reconstruction.
+- More robust and modular code.
 
