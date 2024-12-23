@@ -46,8 +46,6 @@ This script has several command-line options for performing different tasks. Bel
 
 ### Goals
 
-# Goals
-
 - Increase the number of pages.
 - Add compatibility with other text formats.
 - Manipulate embedded images in files.
