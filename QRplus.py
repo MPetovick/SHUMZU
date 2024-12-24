@@ -1,121 +1,112 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import random
 
-# Definimos los 16 colores para representar 4 bits por píxel
-color_map = {
-    '0000': (1, 0, 0),    # Rojo
-    '0001': (0, 1, 0),    # Verde
-    '0010': (0, 0, 1),    # Azul
-    '0011': (1, 1, 0),    # Amarillo
-    '0100': (0.5, 0, 0),  # Rojo oscuro
-    '0101': (0, 0.5, 0),  # Verde oscuro
-    '0110': (0, 0, 0.5),  # Azul oscuro
-    '0111': (0.5, 0.5, 0),# Amarillo oscuro
-    '1000': (0.7, 0.7, 0),# Amarillo claro
-    '1001': (0, 0.7, 0),  # Verde claro
-    '1010': (0.7, 0, 0),  # Rojo claro
-    '1011': (0, 0, 0.7),  # Azul claro
-    '1100': (1, 0.5, 0),  # Naranja
-    '1101': (0, 1, 1),    # Cian
-    '1110': (1, 0, 1),    # Magenta
-    '1111': (1, 1, 1),    # Blanco
-}
+# Función para convertir el texto en binario
+def text_to_binary(data):
+    """Convierte el texto a una cadena de bits binarios."""
+    return ''.join(format(ord(char), '08b') for char in data)
 
-# Invertir el diccionario para poder obtener el código binario de cada color
-reverse_color_map = {v: k for k, v in color_map.items()}
-
-def detect_pattern(qrplus_image, resolution):
-    """
-    Función para detectar el patrón del QRplus: espiral o circular.
-    """
-    # Revisar la simetría y la disposición de los píxeles.
-    # Aquí implementaremos un simple chequeo basado en la forma de los píxeles.
+# Función para generar el QRplus con un patrón espiral
+def generate_qrplus(data, resolution=500):
+    """Genera el QRplus con un patrón espiral y colores."""
+    # Convertimos los datos a binarios
+    binary_data = text_to_binary(data)
     
-    # Verificar si hay un patrón radial (circular)
-    center = (resolution // 2, resolution // 2)
-    radial_pattern = True
+    # Crear una imagen vacía (de 3 canales para colores)
+    qrplus = np.zeros((resolution, resolution, 3), dtype=int)
     
-    # Comprobamos si los píxeles se distribuyen radialmente alrededor del centro
-    for r in range(resolution // 4, resolution // 2):
-        for angle in np.linspace(0, 360, 36):  # 36 puntos de prueba
-            x = int(center[0] + r * np.cos(np.radians(angle)))
-            y = int(center[1] + r * np.sin(np.radians(angle)))
-            if np.all(qrplus_image[x, y] == 0):  # Verifica si el píxel está vacío
-                radial_pattern = False
-                break
-        if not radial_pattern:
-            break
+    # Definir los colores posibles (16 colores diferentes)
+    colors = [
+        [255, 0, 0],    # Rojo
+        [0, 255, 0],    # Verde
+        [0, 0, 255],    # Azul
+        [255, 255, 0],  # Amarillo
+        [255, 0, 255],  # Magenta
+        [0, 255, 255],  # Cian
+        [255, 128, 0],  # Naranja
+        [128, 0, 255],  # Púrpura
+        [255, 255, 255],# Blanco
+        [128, 128, 128],# Gris
+        [0, 0, 0],      # Negro
+        [128, 255, 0],  # Verde Claro
+        [0, 128, 255],  # Azul Claro
+        [255, 0, 128],  # Rosa
+        [128, 255, 255],# Cian Claro
+        [255, 128, 255] # Magenta Claro
+    ]
     
-    # Si encontramos una estructura radial, asumimos que es un patrón circular
-    if radial_pattern:
-        return "circular"
-    else:
-        # Si no, asumimos que es espiral
-        return "spiral"
-
-def decode_qrplus(qrplus_image, resolution=500):
-    """
-    Función optimizada para decodificar una imagen QRplus generada con colores.
-    Detecta automáticamente si es espiral o circular, y maneja distorsiones.
-    """
-    # Detectar el tipo de patrón (espiral o circular)
-    pattern_type = detect_pattern(qrplus_image, resolution)
-    
-    decoded_binary = []
-    
-    # Dependiendo del patrón detectado, ajustamos la lectura de la imagen
-    if pattern_type == "spiral":
-        decoded_binary = decode_spiral(qrplus_image, resolution)
-    elif pattern_type == "circular":
-        decoded_binary = decode_circular(qrplus_image, resolution)
-    
-    # Convertimos la lista de binarios en un string largo
-    decoded_data = ''.join(decoded_binary)
-    
-    # Dividir la cadena binaria en bloques de 8 bits para obtener los caracteres
-    decoded_text = ''.join(chr(int(decoded_data[i:i+8], 2)) for i in range(0, len(decoded_data), 8))
-    
-    return decoded_text
-
-def decode_spiral(qrplus_image, resolution):
-    """
-    Decodifica una imagen QRplus en formato espiral.
-    """
-    decoded_binary = []
+    # Definir el centro de la espiral
     x, y = resolution // 2, resolution // 2
     dx, dy = 0, -1
-    step = resolution // (resolution ** 0.5)
+    max_length = len(binary_data)
     
-    for i in range(resolution**2):  # Aproximación a la cantidad de píxeles
-        # Obtener el color del píxel y convertir a binario
-        color = tuple(qrplus_image[x, y])
-        if color in reverse_color_map:
-            decoded_binary.append(reverse_color_map[color])
+    step = resolution // (len(binary_data) ** 0.5)
+    
+    # Recorrer y llenar la espiral con los datos binarios y asignar colores
+    for i in range(max_length):
+        if i < len(binary_data):
+            bit = int(binary_data[i])
+            color_index = bit % len(colors)  # Elegir un color en función del bit
+            qrplus[x, y] = colors[color_index]  # Asignar el color al píxel correspondiente
         
-        # Movimiento en espiral
-        if (-resolution // 2 < x <= resolution // 2) and (-resolution // 2 < y <= resolution // 2):
+        # Cambiar dirección en la espiral
+        if -resolution // 2 < x <= resolution // 2 and -resolution // 2 < y <= resolution // 2:
             if x == y or (x < 0 and x == -y) or (x > 0 and x == 1 - y):
                 dx, dy = -dy, dx
             x, y = x + dx * step, y + dy * step
-    
-    return decoded_binary
 
-def decode_circular(qrplus_image, resolution):
-    """
-    Decodifica una imagen QRplus en formato circular.
-    """
-    decoded_binary = []
-    center = (resolution // 2, resolution // 2)
-    radius = resolution // 2
-    
-    for r in range(radius):
-        for angle in np.linspace(0, 360, 36):  # 36 puntos de prueba
-            x = int(center[0] + r * np.cos(np.radians(angle)))
-            y = int(center[1] + r * np.sin(np.radians(angle)))
-            # Obtener el color y decodificarlo
-            color = tuple(qrplus_image[x, y])
-            if color in reverse_color_map:
-                decoded_binary.append(reverse_color_map[color])
-    
-    return decoded_binary
+    # Mostrar el código QRplus
+    plt.imshow(qrplus)
+    plt.axis('off')  # Desactivar los ejes para una vista limpia
+    plt.show()
 
+# Función para decodificar un QRplus
+def decode_qrplus(qrplus_image, resolution=500):
+    """Decodifica el QRplus a su texto original a partir de la imagen generada."""
+    # Obtener los colores del código QRplus
+    height, width, _ = qrplus_image.shape
+    decoded_bits = []
+    
+    # Definir los colores y sus valores binarios
+    color_to_bin = {
+        (255, 0, 0): '0',    # Rojo
+        (0, 255, 0): '1',    # Verde
+        (0, 0, 255): '2',    # Azul
+        (255, 255, 0): '3',  # Amarillo
+        (255, 0, 255): '4',  # Magenta
+        (0, 255, 255): '5',  # Cian
+        (255, 128, 0): '6',  # Naranja
+        (128, 0, 255): '7',  # Púrpura
+        (255, 255, 255): '8',# Blanco
+        (128, 128, 128): '9',# Gris
+        (0, 0, 0): 'A',      # Negro
+        (128, 255, 0): 'B',  # Verde Claro
+        (0, 128, 255): 'C',  # Azul Claro
+        (255, 0, 128): 'D',  # Rosa
+        (128, 255, 255): 'E',# Cian Claro
+        (255, 128, 255): 'F' # Magenta Claro
+    }
+
+    # Recorrer los píxeles del QRplus y extraer el valor de cada color
+    for x in range(height):
+        for y in range(width):
+            pixel_color = tuple(qrplus_image[x, y])  # Obtener el color del píxel
+            if pixel_color in color_to_bin:
+                decoded_bits.append(color_to_bin[pixel_color])
+
+    # Convertir los bits a texto (8 bits = 1 byte)
+    binary_data = ''.join(decoded_bits)
+    decoded_text = ''.join(chr(int(binary_data[i:i+8], 2)) for i in range(0, len(binary_data), 8))
+
+    return decoded_text
+
+# Ejemplo de uso
+
+# Paso 1: Generar el QRplus con un mensaje
+data = "QRplus ejemplo"
+generate_qrplus(data)
+
+# Paso 2: Decodificar el QRplus generado (necesitarías la imagen generada para esta parte)
+# Si ejecutas este código en un entorno adecuado, obtendrás la imagen generada y la podrás pasar a la función de decodificación.
+# Para fines demostrativos, decodificamos el texto aquí de forma manual si se tuviera la imagen de qrplus.
