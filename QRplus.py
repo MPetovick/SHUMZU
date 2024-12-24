@@ -119,7 +119,3 @@ def decode_circular(qrplus_image, resolution):
     
     return decoded_binary
 
-# Prueba de decodificación
-# Aquí iría la imagen generada del QRplus (qrplus_image)
-# decoded_message = decode_qrplus(qrplus_image)
-# print("Mensaje decodificado:", decoded_message)
