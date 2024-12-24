@@ -100,13 +100,3 @@ def decode_qrplus(qrplus_image, resolution=500):
     decoded_text = ''.join(chr(int(binary_data[i:i+8], 2)) for i in range(0, len(binary_data), 8))
 
     return decoded_text
-
-# Ejemplo de uso
-
-# Paso 1: Generar el QRplus con un mensaje
-data = "QRplus ejemplo"
-generate_qrplus(data)
-
-# Paso 2: Decodificar el QRplus generado (necesitarías la imagen generada para esta parte)
-# Si ejecutas este código en un entorno adecuado, obtendrás la imagen generada y la podrás pasar a la función de decodificación.
-# Para fines demostrativos, decodificamos el texto aquí de forma manual si se tuviera la imagen de qrplus.
