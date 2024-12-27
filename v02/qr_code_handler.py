@@ -22,7 +22,7 @@ class QRCodeHandler:
                 'file_extension': file_extension   
             }
             
-            if file_name and block_number == 1:
+            if file_name and block_number == 0:
                 qr_data['file_name'] = file_name
             if file_extension and block_number == 0:
                 qr_data['file_extension'] = file_extension
@@ -97,7 +97,9 @@ class QRCodeHandler:
                     decoded_data.append({
                         'data': decoded_block_data,
                         'hash': qr_json['hash'],
-                        'block_number': qr_json['block_number']
+                        'block_number': qr_json['block_number'],
+                        'file_name': qr_json['file_name'],
+                        'file_extension': qr_json['file_extension']
                     })
 
                 except Exception as block_error:
