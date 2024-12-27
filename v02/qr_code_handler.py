@@ -18,7 +18,10 @@ class QRCodeHandler:
                 'data': base64.b64encode(data).decode('utf-8'),
                 'hash': hash_value,
                 'block_number': block_number,
+                'file_name': file_name,
+                'file_extension': file_extension   
             }
+            
             if file_name and block_number == 1:
                 qr_data['file_name'] = file_name
             if file_extension and block_number == 0:
