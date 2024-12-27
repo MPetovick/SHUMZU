@@ -40,7 +40,7 @@ class FileProcessor:
         return blocks
 
     @staticmethod
-    def read_file_in_chunks(file_path, chunk_size=1024 * 1024):
+    def read_file_in_chunks(file_path, chunk_size=2048 * 2048):
         try:
             with open(file_path, 'rb') as file:
                 while chunk := file.read(chunk_size):
@@ -131,7 +131,7 @@ class FileProcessor:
                     output_path = file_path.replace('.enc', '.dec')
                 
                 with open(output_path, 'wb') as output_file:
-                    while chunk := input_file.read(1024 * 1024):  # Bloques de 1 MB
+                    while chunk := input_file.read(2048 * 2048):  # Bloques de 1 MB
                         decrypted_chunk = decryptor.update(chunk)
                         output_file.write(decrypted_chunk)
             
