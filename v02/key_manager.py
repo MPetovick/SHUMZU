@@ -6,7 +6,6 @@ from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from cryptography.hazmat.primitives import hashes
-import pyotp
 from hashlib import sha3_256
 from exceptions import SecretKeyError, FileProcessingError
 
@@ -139,15 +138,3 @@ class KeyManager:
         except Exception as e:
             logging.error(f"Error al descifrar el archivo '{input_path}': {e}")
             raise FileProcessingError("Error al descifrar el archivo.")
-
-    @staticmethod
-    def generate_otp(secret: str):
-
-        totp = pyotp.TOTP(secret)
-        return totp.now()
-
-    @staticmethod
-    def verify_otp(secret: str, otp: str) -> bool:
-
-        totp = pyotp.TOTP(secret)
-        return totp.verify(otp)
