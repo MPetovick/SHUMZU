@@ -20,7 +20,7 @@ class KeyManager:
     def derive_key(password: str, salt: bytes) -> bytes:
 
         kdf = PBKDF2HMAC(
-            algorithm=hashes.SHA256(),
+            algorithm=hashes.SHA3_256(),
             length=32,  # Clave de 256 bits
             salt=salt,
             iterations=100000,  # Alta cantidad de iteraciones para hacer más lento el proceso
