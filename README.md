@@ -103,7 +103,11 @@ As digital security concerns continue to rise, this system offers a practical so
 
 SHUMZU protected
 ![WALLET SHUMZU](SHUMZU_12words.png) 
-Wallet restore
+
+---
+
+SHUMZU no protected
+![WALLET SHUMZU](HelloWorld.png) 
 
 
 ---
