@@ -1,4 +1,4 @@
-# SHUMZU - quick response secure storage and transmission 
+# SHUMZU - QR Secure Storage & Transmission 
 ![SHUMZUlogo](/logo_SHUMZU.png)![SHUMZUlogo](/logo_SHUMZU.png)![SHUMZUlogo](/logo_SHUMZU.png)![SHUMZUlogo](/logo_SHUMZU.png)![SHUMZUlogo](/logo_SHUMZU.png)![SHUMZUlogo](/logo_SHUMZU.png)![SHUMZUlogo](/logo_SHUMZU.png)
 ### Whitepaper
 
