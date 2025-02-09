@@ -2,7 +2,7 @@
 """
 SHUMZU - Secure Storage and Transmission via QR
 Author: Mike Petovick
-Date: 2024-12-15
+Date: 2024-12-21
 """
 import secrets
 import base64
