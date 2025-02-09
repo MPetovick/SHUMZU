@@ -100,9 +100,12 @@ The integration of **QR codes**, **blockchain**, and **encryption** offers a hig
 As digital security concerns continue to rise, this system offers a practical solution for maintaining data privacy, integrity, and availability in an increasingly connected world.
 
 ---
-SHUMZU password protected
+
+SHUMZU protected
 ![WALLET SHUMZU](SHUMZU_12words.png) 
-Wallet restore example
+Wallet restore
+
+
 ---
 ## Donations
 BTC:
