@@ -18,19 +18,6 @@ To decode the file:
 - It decodes each QR code into its corresponding block of encrypted data (if applicable).
 - The blocks are recombined, decrypted (if applicable), and decompressed to reconstruct the original file.
 
-## **Security Considerations**
-1. **Password Protection**: When encrypting with a password, ensure that the password is stored securely. The security of the encryption depends on the strength of the password.
-2. **File Integrity**: SHUMZU uses SHA3-256 hashing to ensure that the file is restored correctly and without corruption.
-
-## **Limitations**
-- The maximum size of the file that can be encoded is constrained by the size of the QR code and the limits of QR code storage capacity.
-- Compression algorithms are used to reduce the size of the file before encoding, but very large files may require splitting into a large number of QR codes, resulting in a large image.
-
-## **Command-Line Usage**
-
-### **1. Generating QR Codes from Files**
-You can use SHUMZU to convert files into QR codes for secure transmission.
-
 #### **Command**
 ```bash
 python SHUMZU.py -f <file_path> -o <output_qr_image> -p <password (optional)>
