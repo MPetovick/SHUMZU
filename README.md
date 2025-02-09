@@ -6,22 +6,22 @@ SHUMZU is a tool designed to securely store and transmit data using QR codes. It
 
 ---
 
-Enhanced Security:
+**Enhanced Security:**
 SHUMZU offers an additional level of security by combining AES-GCM encryption with data compression. This is especially useful for users who handle sensitive information.
 
-Versatility:
+**Versatility:**
 The program supports any type of file (text, images, binaries, etc.), making it suitable for a wide range of applications.
 
-Use Facilities:
+**Use Facilities:**
 The command line interface is intuitive and allows users to generate or decode QR code arrays with just a few commands.
 
-Efficiency:
+**Efficiency:**
 Parallelization in QR code generation and data compression make SHUMZU efficient even for large file sizes.
 
-Portability:
+**Portability:**
 The generated QR codes can be printed or stored on mobile devices, allowing data to be transported physically or digitally without worrying about security.
 
-Data Integrity:
+**Data Integrity:**
 Integrity verification using SHA3-256 hashing ensures that data has not been altered during transmission or storage.
 
 ---
@@ -39,7 +39,7 @@ Integrity verification using SHA3-256 hashing ensures that data has not been alt
 ---
 ### Conclusion
 
-SHUMZU is a powerful and versatile tool that combines compression, encryption and QR codes to offer a secure and efficient solution for data storage and transmission. Its potential is broad, from personal applications to professional and business uses. For the user, SHUMZU represents an innovative way to protect and manage confidential information, guaranteeing security, integrity and portability.
+**SHUMZU** is a powerful and versatile tool that combines compression, encryption and QR codes to offer a secure and efficient solution for data storage and transmission. Its potential is broad, from personal applications to professional and business uses. For the user, SHUMZU represents an innovative way to protect and manage confidential information, guaranteeing security, integrity and portability.
 
 ---
 ### Exemples
