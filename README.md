@@ -1,4 +1,5 @@
-# SHUMZU - quick response secure storage and transmission ![SHUMZUlogo](/logo_SHUMZU.png)
+# SHUMZU - quick response secure storage and transmission 
+![SHUMZUlogo](/logo_SHUMZU.png)![SHUMZUlogo](/logo_SHUMZU.png)![SHUMZUlogo](/logo_SHUMZU.png)![SHUMZUlogo](/logo_SHUMZU.png)![SHUMZUlogo](/logo_SHUMZU.png)
 ### Whitepaper
 
 #### Abstract
