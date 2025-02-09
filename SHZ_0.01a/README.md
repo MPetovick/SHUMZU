@@ -26,6 +26,6 @@ python SHUMZU.py -f <file_path> -o <output_qr_image>
 python SHUMZU.py -f <output_qr_image> -o <output_file> -d
 ```
 
-- **`-f <qr_image_path>`**: The file to convert.
-- **`-o <output_file>`**: Path to save the SHUMZU file. (optional)
+- **`-f <file_path>`**: The file to convert.
+- **`-o <output_qr_image>`**: Path to save the SHUMZU file. (optional)
 - **`-d`**: Enable decoding mode to decode QR codes.
