@@ -1,6 +1,7 @@
-# SHUMZU - QR Secure Storage & Transmission _version SHZ_0.01a_
+# SHUMZU - QR Secure Storage & Transmission 
 ![SHUMZUlogo](./rsc/logo_SHUMZU.png)![SHUMZUlogo](./rsc/logo_SHUMZU.png)![SHUMZUlogo](./rsc/logo_SHUMZU.png)![SHUMZUlogo](./rsc/logo_SHUMZU.png)![SHUMZUlogo](./rsc/logo_SHUMZU.png)![SHUMZUlogo](./rsc/logo_SHUMZU.png)![SHUMZUlogo](./rsc/logo_SHUMZU.png) 
 
+_version SHZ_0.01a_
 ---
 
 **SHUMZU** is a tool designed to securely store and transmit data using QR codes. It combines compression, encryption and QR code generation techniques to offer a robust and versatile solution.
