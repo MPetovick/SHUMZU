@@ -73,7 +73,6 @@ class SHUMZU:
         if not decoded_objects:
             raise ValueError("No QR codes detected.")
         
-        # Solicitar contraseña si no se proporcionó y los datos están cifrados
         if not self.password and any('data' in json.loads(obj.data) for obj in decoded_objects):
             self.password = getpass.getpass("Enter password for decryption (leave blank if unencrypted): ")
         
@@ -85,10 +84,8 @@ class SHUMZU:
                 encrypted_data = data['data']
                 
                 if self.password:
-                    # Intentar descifrar y descomprimir
                     decrypted_data = self.decompress(self.decrypt(encrypted_data))
                 else:
-                    # Solo descomprimir
                     decrypted_data = self.decompress(base64.b64decode(encrypted_data))
                 
                 result[index] = decrypted_data
