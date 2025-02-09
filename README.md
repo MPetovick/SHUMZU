@@ -1,6 +1,5 @@
-# SHUMZU
-## Secure Storage and Transmission via QR ![SHUMZUlogo](/logo_SHUMZU.png)
-
+# SHUMZU - Secure Storage and Transmission via QR 
+![SHUMZUlogo](/logo_SHUMZU.png)
 ### Whitepaper
 
 #### Abstract
