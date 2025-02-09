@@ -1,7 +1,4 @@
 # SHUMZU - QR Secure Storage & Transmission 
-![SHUMZUlogo](./rsc/logo_SHUMZU.png)![SHUMZUlogo](./rsc/logo_SHUMZU.png)![SHUMZUlogo](./rsc/logo_SHUMZU.png)![SHUMZUlogo](./rsc/logo_SHUMZU.png)![SHUMZUlogo](./rsc/logo_SHUMZU.png)
-![SHUMZUlogo](./rsc/logo_SHUMZU.png)![SHUMZUlogo](./rsc/logo_SHUMZU.png)
-
 
 #### Abstract
 
