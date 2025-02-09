@@ -1,4 +1,4 @@
-# SHUMZU - Quick response secure storage and transmission
+# SHUMZU - quick response secure storage and transmission
 ![SHUMZUlogo](/logo_SHUMZU.png)
 ### Whitepaper
 
