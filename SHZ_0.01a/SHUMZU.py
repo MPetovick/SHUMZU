@@ -10,6 +10,7 @@ import json
 import os
 import logging
 import argparse
+import getpass
 from pathlib import Path
 from hashlib import sha3_256
 from Crypto.Cipher import AES
@@ -71,7 +72,31 @@ class SHUMZU:
         decoded_objects = decode(image)
         if not decoded_objects:
             raise ValueError("No QR codes detected.")
-        return {json.loads(obj.data)['index']: self.decompress(self.decrypt(json.loads(obj.data)['data'])) if self.password else self.decompress(base64.b64decode(json.loads(obj.data)['data'])) for obj in decoded_objects}
+        
+        # Solicitar contraseña si no se proporcionó y los datos están cifrados
+        if not self.password and any('data' in json.loads(obj.data) for obj in decoded_objects):
+            self.password = getpass.getpass("Enter password for decryption (leave blank if unencrypted): ")
+        
+        result = {}
+        for obj in decoded_objects:
+            try:
+                data = json.loads(obj.data)
+                index = data['index']
+                encrypted_data = data['data']
+                
+                if self.password:
+                    # Intentar descifrar y descomprimir
+                    decrypted_data = self.decompress(self.decrypt(encrypted_data))
+                else:
+                    # Solo descomprimir
+                    decrypted_data = self.decompress(base64.b64decode(encrypted_data))
+                
+                result[index] = decrypted_data
+            except (ValueError, KeyError) as e:
+                logging.error(f"Error decoding QR block {index}: {e}")
+                continue
+        
+        return result
 
     def process_file(self, file_path: str) -> tuple:
         data = Path(file_path).read_bytes()
@@ -105,6 +130,7 @@ class SHUMZU:
         Path(output_file).write_bytes(file_data)
         logging.info(f"File restored to {output_file}")
 
+
 def main():
     parser = argparse.ArgumentParser(description="Generate or decode QR codes from files.")
     parser.add_argument('-f', '--file', help="Input file or QR matrix for decoding")
@@ -114,7 +140,11 @@ def main():
     parser.add_argument('-of', '--output_folder', help="Output folder for decoded files", default=".")
     args = parser.parse_args()
 
-    shumzu = SHUMZU(args.password)
+    password = args.password
+    if not args.decode and not password:
+        password = getpass.getpass("Enter password for encryption (leave blank for no encryption): ")
+    
+    shumzu = SHUMZU(password)
     try:
         if args.decode:
             if not args.file:
