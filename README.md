@@ -101,14 +101,14 @@ As digital security concerns continue to rise, this system offers a practical so
 
 
 ---
-#### Exemples
+### Exemples
 
-SHUMZU protected
+#### SHUMZU protected
 ![WALLET SHUMZU](SHUMZU_12words.png) 
 
 ---
 
-SHUMZU no protected
+#### SHUMZU no protected
 ![WALLET SHUMZU](HelloWorld.png) 
 
 ---
