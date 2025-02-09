@@ -5,7 +5,7 @@ _version SHZ_0.01a_
 
 ---
 
-**SHUMZU** is a tool designed to securely store and transmit data using QR codes. It combines compression, encryption and QR code generation techniques to offer a robust and versatile solution.
+**SHUMZU** is a powerful and versatile tool that combines compression, encryption and QR codes to offer a secure and efficient solution for data storage and transmission. Its potential is broad, from personal applications to professional and business uses. For the user,represents an innovative way to protect and manage confidential information, guaranteeing security, integrity and portability.
 
 
 **Enhanced Security:**
@@ -37,11 +37,6 @@ Integrity verification using SHA3-256 hashing ensures that data has not been alt
 - Reduction of risks of digital theft.    
 - High security in communication.  
 - Avoid detection by digital surveillance systems.
-
----
-### Conclusion
-
-**SHUMZU** is a powerful and versatile tool that combines compression, encryption and QR codes to offer a secure and efficient solution for data storage and transmission. Its potential is broad, from personal applications to professional and business uses. For the user,represents an innovative way to protect and manage confidential information, guaranteeing security, integrity and portability.
 
 ---
 ### Exemples
