@@ -47,12 +47,12 @@ Integrity verification using SHA3-256 hashing ensures that data has not been alt
 ### Exemples
 
 #### SHUMZU protected
-![WALLET SHUMZU](SHUMZU_12words.png) 
+![WALLET SHUMZU](./rsc/SHUMZU_12words.png) 
 
 ---
 
 #### SHUMZU no protected
-![WALLET SHUMZU](HelloWorld.png) 
+![WALLET SHUMZU](./rsc/HelloWorld.png) 
 
 ---
 
