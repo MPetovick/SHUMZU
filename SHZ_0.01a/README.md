@@ -18,11 +18,10 @@ To decode the file:
 - It decodes each QR code into its corresponding block of encrypted data (if applicable).
 - The blocks are recombined, decrypted (if applicable), and decompressed to reconstruct the original file.
 
-#### **Commands**
+#### **Command**
 ```bash
 python SHUMZU.py -f <file_path> -o <output_qr_image> 
 ```
-#### **Command**
 ```bash
 python SHUMZU.py -f <output_qr_image> -o <output_file> -d
 ```
