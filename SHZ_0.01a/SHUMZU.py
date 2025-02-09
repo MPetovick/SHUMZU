@@ -8,6 +8,7 @@ import secrets
 import base64
 import json
 import os
+import getpass
 import logging
 import argparse
 from pathlib import Path
@@ -105,17 +106,19 @@ class SHUMZU:
         Path(output_file).write_bytes(file_data)
         logging.info(f"File restored to {output_file}")
 
-
 def main():
     parser = argparse.ArgumentParser(description="Generate or decode QR codes from files.")
     parser.add_argument('-f', '--file', help="Input file or QR matrix for decoding")
     parser.add_argument('-o', '--output', help="Output path for QR matrix or decoded file", default="output.png")
     parser.add_argument('-d', '--decode', help="Decode QR matrix", action='store_true')
-    parser.add_argument('-p', '--password', help="Password for encryption/decryption (optional)")
     parser.add_argument('-of', '--output_folder', help="Output folder for decoded files", default=".")
     args = parser.parse_args()
 
-    shumzu = SHUMZU(args.password)
+    password = None
+    if not args.decode:
+        password = getpass.getpass("Enter password for encryption (leave blank for no encryption): ")
+    
+    shumzu = SHUMZU(password)
     try:
         if args.decode:
             if not args.file:
