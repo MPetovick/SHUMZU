@@ -41,7 +41,7 @@ Integrity verification using SHA3-256 hashing ensures that data has not been alt
 ---
 ### Conclusion
 
-**SHUMZU** is a powerful and versatile tool that combines compression, encryption and QR codes to offer a secure and efficient solution for data storage and transmission. Its potential is broad, from personal applications to professional and business uses. For the user, SHUMZU represents an innovative way to protect and manage confidential information, guaranteeing security, integrity and portability.
+**SHUMZU** is a powerful and versatile tool that combines compression, encryption and QR codes to offer a secure and efficient solution for data storage and transmission. Its potential is broad, from personal applications to professional and business uses. For the user,represents an innovative way to protect and manage confidential information, guaranteeing security, integrity and portability.
 
 ---
 ### Exemples
