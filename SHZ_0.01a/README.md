@@ -1,4 +1,4 @@
-## **SHUMZU - Secure Storage and Transmission via QR**
+## **SHUMZU - QR Secure Storage & Transmission**
 
 ### **What is SHUMZU?**
 
