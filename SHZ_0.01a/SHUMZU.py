@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-SHUMZU - Secure Storage and Transmission via QR
-Author: Mike Petovick
+SHUMZU - QR Secure Storage & Transmission
+Author: MikePetovick
 Date: 2024-12-21
 """
 import secrets
