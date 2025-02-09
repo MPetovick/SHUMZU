@@ -114,16 +114,34 @@ class SHUMZU:
             row, col = divmod(idx, cols)
             matrix_image.paste(img, (col * QR_SIZE, row * QR_SIZE))
         
-        matrix_image.save(output_path)
-        logging.info(f"QR matrix saved to {output_path}")
+        base_name = os.path.splitext(os.path.basename(file_path))[0]
+        output_file = f"{base_name}_SHUMZU.png"
+        
+        counter = 1
+        while os.path.exists(output_file):
+            output_file = f"{base_name}_SHUMZU_{counter}.png"
+            counter += 1
+        
+        matrix_image.save(output_file)
+        logging.info(f"QR matrix saved to {output_file}")
         matrix_image.show()
 
     def decode_qr_matrix(self, image_path: str, output_folder: str):
         decoded_data = self.decode_qr(Image.open(image_path))
         metadata, file_data = json.loads(decoded_data[0].decode()), b''.join(decoded_data[idx] for idx in sorted(decoded_data) if idx)
+        
         if metadata["hash"] != sha3_256(file_data).hexdigest():
             raise ValueError("File integrity check failed.")
-        output_file = os.path.join(output_folder, metadata["file_name"])
+        
+        original_filename = metadata["file_name"]
+        base_name, ext = os.path.splitext(original_filename)
+        output_file = os.path.join(output_folder, original_filename)
+        
+        counter = 1
+        while os.path.exists(output_file):
+            output_file = os.path.join(output_folder, f"{base_name}_SHUMZU_{counter}{ext}")
+            counter += 1
+        
         Path(output_file).write_bytes(file_data)
         logging.info(f"File restored to {output_file}")
 
