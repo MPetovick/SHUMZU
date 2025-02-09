@@ -1,4 +1,4 @@
-# Secure storage, transmission and reconstruction
+# Secure Storage and Transmission via QR
  ![SHUMZUlogo](/logo_SHUMZU.png) ![SHUMZUlogo](/logo_SHUMZU.png) ![SHUMZUlogo](/logo_SHUMZU.png)  ![SHUMZUlogo](/logo_SHUMZU.png)  ![SHUMZUlogo](/logo_SHUMZU.png)  ![SHUMZUlogo](/logo_SHUMZU.png)  ![SHUMZUlogo](/logo_SHUMZU.png)  ![SHUMZUlogo](/logo_SHUMZU.png)  ![SHUMZUlogo](/logo_SHUMZU.png)
 
 ### Whitepaper
