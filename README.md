@@ -9,7 +9,7 @@ _version SHZ_0.01a_
 
 
 **Enhanced Security:**
-SHUMZU offers an additional level of security by combining AES-GCM encryption with data compression. This is especially useful for users who handle sensitive information.
+Offers an additional level of security by combining AES-GCM encryption with data compression. This is especially useful for users who handle sensitive information.
 
 **Versatility:**
 The program supports any type of file (text, images, binaries, etc.), making it suitable for a wide range of applications.
