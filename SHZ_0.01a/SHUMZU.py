@@ -8,7 +8,6 @@ import secrets
 import base64
 import json
 import os
-import getpass
 import logging
 import argparse
 from pathlib import Path
@@ -111,14 +110,11 @@ def main():
     parser.add_argument('-f', '--file', help="Input file or QR matrix for decoding")
     parser.add_argument('-o', '--output', help="Output path for QR matrix or decoded file", default="output.png")
     parser.add_argument('-d', '--decode', help="Decode QR matrix", action='store_true')
+    parser.add_argument('-p', '--password', help="Password for encryption/decryption (optional)")
     parser.add_argument('-of', '--output_folder', help="Output folder for decoded files", default=".")
     args = parser.parse_args()
 
-    password = None
-    if not args.decode:
-        password = getpass.getpass("Enter password for encryption (leave blank for no encryption): ")
-    
-    shumzu = SHUMZU(password)
+    shumzu = SHUMZU(args.password)
     try:
         if args.decode:
             if not args.file:
