@@ -24,13 +24,12 @@ from concurrent.futures import ThreadPoolExecutor
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-# Constants
 SALT_SIZE = 16
 NONCE_SIZE = 12
 DEFAULT_ITERATIONS = 600000
-BLOCK_SIZE = 1024  # Optimizado el tamaño de los bloques para un mejor rendimiento
-COMPRESSION_LEVEL = 19  # Mantener compresión alta para máxima reducción de tamaño
-QR_SIZE = 321  # Tamaño de QR ajustable
+BLOCK_SIZE = 1024
+COMPRESSION_LEVEL = 19
+QR_SIZE = 321
 
 class SHUMZU:
     def __init__(self, password: str = None):
@@ -53,19 +52,16 @@ class SHUMZU:
         return cipher.decrypt_and_verify(ciphertext, tag)
 
     def compress(self, data: bytes) -> bytes:
-        # Primero, comprimir con Brotli y luego con Zstandard
         return zstd.ZstdCompressor(level=COMPRESSION_LEVEL).compress(brotli.compress(data))
 
     def decompress(self, data: bytes) -> bytes:
-        # Primero, descomprimir con Zstandard y luego con Brotli
         return brotli.decompress(zstd.ZstdDecompressor().decompress(data))
 
     def generate_qr(self, data: bytes, index: int) -> Image.Image:
-        # Ajustamos la versión y el nivel de corrección de errores para maximizar la capacidad de los QR
         encrypted = self.encrypt(self.compress(data)) if self.password else base64.b64encode(self.compress(data)).decode()
         qr = qrcode.QRCode(
-            version=10,  # Utilizamos una versión más alta para almacenar más datos
-            error_correction=qrcode.constants.ERROR_CORRECT_L  # Menor corrección de errores para una mayor densidad de datos
+            version=10, 
+            error_correction=qrcode.constants.ERROR_CORRECT_L  
         )
         qr.add_data(json.dumps({'index': index, 'data': encrypted}))
         qr.make(fit=True)
