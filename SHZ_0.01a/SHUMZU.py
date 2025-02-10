@@ -28,13 +28,13 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 SALT_SIZE = 16
 NONCE_SIZE = 12
 DEFAULT_ITERATIONS = 600000
-BLOCK_SIZE = 1024
 COMPRESSION_LEVEL = 19
 QR_SIZE = 200
 
 class SHUMZU:
-    def __init__(self, password: str = None):
+    def __init__(self, password: str = None, block_size: int = 1024):
         self.password = password
+        self.block_size = block_size
 
     def derive_key(self, salt: bytes) -> bytes:
         return PBKDF2(self.password, salt, dkLen=32, count=DEFAULT_ITERATIONS)
@@ -98,7 +98,7 @@ class SHUMZU:
     def process_file(self, file_path: str) -> tuple:
         data = Path(file_path).read_bytes()
         metadata = json.dumps({"file_name": os.path.basename(file_path), "hash": sha3_256(data).hexdigest()}).encode()
-        return [metadata] + [data[i:i+BLOCK_SIZE] for i in range(0, len(data), BLOCK_SIZE)]
+        return [metadata] + [data[i:i+self.block_size] for i in range(0, len(data), self.block_size)]
 
     def generate_qr_matrix(self, file_path: str, output_path: str):
         blocks = self.process_file(file_path)
@@ -144,7 +144,7 @@ class SHUMZU:
         
         Path(output_file).write_bytes(file_data)
         logging.info(f"File restored to {output_file}")
-
+        
 
 def main():
     parser = argparse.ArgumentParser(description="Generate or decode QR codes from files.")
@@ -153,13 +153,14 @@ def main():
     parser.add_argument('-d', '--decode', help="Decode QR matrix", action='store_true')
     parser.add_argument('-p', '--password', help="Password for encryption/decryption (optional)")
     parser.add_argument('-of', '--output_folder', help="Output folder for decoded files", default=".")
+    parser.add_argument('-bs', '--block_size', type=int, default=1024, help="Block size for splitting files (default: 1024)")
     args = parser.parse_args()
 
     password = args.password
     if not args.decode and not password:
         password = getpass.getpass("Enter password for encryption (leave blank for no encryption): ")
     
-    shumzu = SHUMZU(password)
+    shumzu = SHUMZU(password, args.block_size)
     try:
         if args.decode:
             if not args.file:
