@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 SHUMZU - QR Secure Storage & Transmission
-Author: MikePetovick
+Author: MikePetovick (Optimized by ChatGPT)
 Date: 2024-12-21
 """
 import secrets
@@ -31,10 +31,13 @@ NONCE_SIZE = 12
 COMPRESSION_LEVEL = 19
 QR_SIZE = 200
 
-ARGON2_TIME_COST = 2
-ARGON2_MEMORY_COST = 102400
-ARGON2_PARALLELISM = 8
-ARGON2_HASH_LENGTH = 32
+ARGON2_PARAMS = {
+    "time_cost": 2,
+    "memory_cost": 102400,
+    "parallelism": 8,
+    "hash_len": 32,
+    "type": Type.ID,
+}
 
 class SHUMZU:
     def __init__(self, password: Optional[str] = None, block_size: int = 1024):
@@ -48,12 +51,8 @@ class SHUMZU:
         
         key = hash_secret_raw(
             secret=self.password.encode(),
-            salt=salt,                     
-            time_cost=ARGON2_TIME_COST,    
-            memory_cost=ARGON2_MEMORY_COST, 
-            parallelism=ARGON2_PARALLELISM, 
-            hash_len=ARGON2_HASH_LENGTH,   
-            type=Type.ID                   
+            salt=salt,
+            **ARGON2_PARAMS
         )
         return key
 
@@ -80,8 +79,8 @@ class SHUMZU:
             )
             key = self.derive_key(salt)
             return AES.new(key, AES.MODE_GCM, nonce=nonce).decrypt_and_verify(ciphertext, tag)
-        except Exception:
-            raise ValueError("Decryption error: incorrect password or corrupted data.")
+        except Exception as e:
+            raise ValueError(f"Decryption failed: {e}")
 
     def compress(self, data: bytes) -> bytes:
         """Compresses data using Brotli and Zstandard."""
@@ -115,8 +114,8 @@ class SHUMZU:
                     else self.decompress(base64.b64decode(encrypted_data))
                 )
                 result[index] = decrypted_data
-            except (ValueError, KeyError) as e:
-                logging.error(f"Error decoding QR block {index}: {e}")
+            except Exception as e:
+                logging.error(f"Error decoding QR block {data.get('index', '?')}: {e}")
         return result
 
     def process_file(self, file_path: str) -> Tuple[bytes, List[bytes]]:
@@ -125,6 +124,9 @@ class SHUMZU:
             raise FileNotFoundError(f"The file {file_path} does not exist.")
         
         data = Path(file_path).read_bytes()
+        if not data:
+            raise ValueError("The file is empty.")
+        
         metadata = json.dumps({"file_name": os.path.basename(file_path), "hash": sha3_256(data).hexdigest()}).encode()
         return metadata, [data[i:i+self.block_size] for i in range(0, len(data), self.block_size)]
 
