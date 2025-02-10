@@ -42,7 +42,7 @@ class SHUMZU:
         self.block_size = block_size
 
     def derive_key(self, salt: bytes) -> bytes:
-        """Deriva una clave usando Argon2."""
+        """Derives a key using Argon2."""
         if not self.password:
             raise ValueError("Password is required for key derivation.")
         
@@ -58,7 +58,7 @@ class SHUMZU:
         return key
 
     def encrypt(self, data: bytes) -> str:
-        """Cifra datos usando AES-GCM."""
+        """Encrypts data using AES-GCM."""
         salt = secrets.token_bytes(SALT_SIZE)
         nonce = secrets.token_bytes(NONCE_SIZE)
         key = self.derive_key(salt)
@@ -69,23 +69,30 @@ class SHUMZU:
         return base64.b64encode(encrypted_blob).decode()
 
     def decrypt(self, encrypted_data: str) -> bytes:
-        blob = base64.b64decode(encrypted_data)
-        salt = blob[:SALT_SIZE]
-        nonce = blob[SALT_SIZE:SALT_SIZE+NONCE_SIZE]
-        tag = blob[SALT_SIZE+NONCE_SIZE:SALT_SIZE+NONCE_SIZE+16]
-        ciphertext = blob[SALT_SIZE+NONCE_SIZE+16:]
-        
-        key = self.derive_key(salt)
-        cipher = AES.new(key, AES.MODE_GCM, nonce=nonce)
-        return cipher.decrypt_and_verify(ciphertext, tag)
+        """Decrypts data using AES-GCM."""
+        try:
+            blob = base64.b64decode(encrypted_data)
+            salt, nonce, tag, ciphertext = (
+                blob[:SALT_SIZE],
+                blob[SALT_SIZE:SALT_SIZE+NONCE_SIZE],
+                blob[SALT_SIZE+NONCE_SIZE:SALT_SIZE+NONCE_SIZE+16],
+                blob[SALT_SIZE+NONCE_SIZE+16:],
+            )
+            key = self.derive_key(salt)
+            return AES.new(key, AES.MODE_GCM, nonce=nonce).decrypt_and_verify(ciphertext, tag)
+        except Exception:
+            raise ValueError("Decryption error: incorrect password or corrupted data.")
 
     def compress(self, data: bytes) -> bytes:
+        """Compresses data using Brotli and Zstandard."""
         return zstd.ZstdCompressor(level=COMPRESSION_LEVEL).compress(brotli.compress(data))
 
     def decompress(self, data: bytes) -> bytes:
+        """Decompresses data using Brotli and Zstandard."""
         return brotli.decompress(zstd.ZstdDecompressor().decompress(data))
 
     def generate_qr(self, data: bytes, index: int) -> Image.Image:
+        """Generates a QR code from data."""
         encrypted = self.encrypt(self.compress(data)) if self.password else base64.b64encode(self.compress(data)).decode()
         qr = qrcode.QRCode(version=10, error_correction=qrcode.constants.ERROR_CORRECT_L)
         qr.add_data(json.dumps({'index': index, 'data': encrypted}))
@@ -93,6 +100,7 @@ class SHUMZU:
         return qr.make_image(fill='black', back_color='white').resize((QR_SIZE, QR_SIZE))
 
     def decode_qr(self, image: Image.Image) -> Dict[int, bytes]:
+        """Decodes a QR code and returns the data."""
         decoded_objects = decode(image)
         if not decoded_objects:
             raise ValueError("No QR codes detected.")
@@ -112,13 +120,18 @@ class SHUMZU:
         return result
 
     def process_file(self, file_path: str) -> Tuple[bytes, List[bytes]]:
+        """Processes a file into blocks and generates metadata."""
+        if not os.path.exists(file_path):
+            raise FileNotFoundError(f"The file {file_path} does not exist.")
+        
         data = Path(file_path).read_bytes()
         metadata = json.dumps({"file_name": os.path.basename(file_path), "hash": sha3_256(data).hexdigest()}).encode()
         return metadata, [data[i:i+self.block_size] for i in range(0, len(data), self.block_size)]
 
     def generate_qr_matrix(self, file_path: str, output_path: str):
+        """Generates a QR code matrix in parallel."""
         metadata, blocks = self.process_file(file_path)
-        total_blocks = len(blocks) + 1  # Incluye metadatos
+        total_blocks = len(blocks) + 1  # Includes metadata
         cols = int(total_blocks ** 0.5)
         rows = (total_blocks + cols - 1) // cols
         
@@ -136,6 +149,10 @@ class SHUMZU:
         matrix_image.show()
 
     def decode_qr_matrix(self, image_path: str, output_folder: str):
+        """Decodes a QR code matrix and reconstructs the original file."""
+        if not os.path.exists(image_path):
+            raise FileNotFoundError(f"The image {image_path} does not exist.")
+        
         decoded_data = self.decode_qr(Image.open(image_path))
         metadata, file_data = json.loads(decoded_data[0].decode()), b''.join(decoded_data[idx] for idx in sorted(decoded_data) if idx)
         
@@ -147,6 +164,7 @@ class SHUMZU:
         logging.info(f"File restored to {output_file}")
 
     def _get_unique_filename(self, path: str) -> str:
+        """Generates a unique filename to avoid overwriting."""
         base, ext = os.path.splitext(path)
         counter = 1
         while os.path.exists(path):
