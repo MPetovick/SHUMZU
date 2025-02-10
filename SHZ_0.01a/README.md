@@ -44,7 +44,7 @@ python SHUMZU.py -f <output_qr_image> -o <output_file> -d
 | **Images**              | `.png`, `.jpg`, `.jpeg`, `.gif`, `.bmp`, `.tiff`, `.webp` | `500` bytes |
 | **Compressed Files**    | `.zip`, `.rar`, `.tar`, `.gz`, `.7z` | `420` bytes |
 | **Audio & Video**       | `.mp3`, `.wav`, `.ogg`, `.mp4`, `.avi`, `.mkv`, `.mov` | `500` bytes |
-| **Other Large Files**    | `.iso`, `.exe`, `.bin`, `.dmg` | `420` bytes |
+| **Other Large Files**    | `.iso`, `.exe`, `.bin`, `.dmg` | `500` bytes |
 
 🔹 **Reason for the adjustment**:  
 - **`1024` for text/code files** → These files are more tolerant of data loss and reconstruction errors.  
