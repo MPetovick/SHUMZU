@@ -1,44 +1,42 @@
-## **SHUMZU License (MIT-Modified)**  
+MIT License  
 
-**MIT License – Customized for SHUMZU**  
-
-Copyright (c) 2024 **SHUMZU** by **MikePetovick**  
+Copyright (c) 2024 SHUMZU by MikePetovick  
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to use, copy, and modify the Software under the following conditions:  
 
-### **1. Personal and Commercial Use**  
-- The Software may be used for **personal, educational, and open-source projects** free of charge.  
-- Any **commercial use** of the Software requires compliance with the licensing conditions outlined below.  
+1. Personal and Commercial Use  
+- The Software may be used for personal, educational, and open-source projects free of charge.  
+- Any commercial use of the Software requires compliance with the licensing conditions outlined below.  
 
-### **2. Licensing for Commercial Use**  
-- Companies or individuals that generate **more than 1 million USD annually** and use the Software **in any capacity** must obtain a **commercial license** from the copyright holder.  
-- Any use of the Software **in commercial products or services** (including but not limited to resale, SaaS, and integrations into paid software) requires a **commercial license**, regardless of annual revenue.  
+2. Licensing for Commercial Use  
+- Companies or individuals that generate more than 1 million USD annually and use the Software in any capacity must obtain a commercial license from the copyright holder.  
+- Any use of the Software in commercial products or services (including but not limited to resale, SaaS, and integrations into paid software) requires a commercial license, regardless of annual revenue.  
 - Startups and small businesses below this revenue threshold may use the Software freely but are encouraged to support its development.  
 
-### **3. Modifications and Distribution**  
-- Modifications to the Software are **permitted**, but they must be **clearly documented**, and any distribution of modified code must **retain the original copyright notice** and this license.  
-- The Software **may not** be sublicensed, resold, or redistributed without express permission from the copyright holder.  
+3. Modifications and Distribution  
+- Modifications to the Software are permitted, but they must be clearly documented, and any distribution of modified code must retain the original copyright notice and this license.  
+- The Software may not be sublicensed, resold, or redistributed without express permission from the copyright holder.  
 
-### **4. Intellectual Property**  
-- The copyright holder **retains all intellectual property rights** related to the Software, including but not limited to trademarks, patents, and trade secrets.  
+4. Intellectual Property 
+- The copyright holder retains all intellectual property rights related to the Software, including but not limited to trademarks, patents, and trade secrets.  
 
-### **5. Attribution and Credit**  
-- Commercial applications or derivative products must include **proper attribution** to the original author.  
+5. Attribution and Credit
+- Commercial applications or derivative products must include proper attribution to the original author.  
 - If possible, a reference to the original Software source should be provided.  
 
-### **6. No Warranty**  
-- The Software is provided **"as is"**, without any warranties, express or implied, including but not limited to merchantability, fitness for a particular purpose, or non-infringement.  
-- The authors are **not liable** for any claim, damage, or other liability arising from the use or misuse of the Software.  
+6. No Warranty**  
+- The Software is provided "as is", without any warranties, express or implied, including but not limited to merchantability, fitness for a particular purpose, or non-infringement.  
+- The authors are not liable for any claim, damage, or other liability arising from the use or misuse of the Software.  
 
-### **7. License Revocation**  
-- The copyright holder reserves the right to **revoke this license** at any time for entities that violate the terms of use.  
-- Any revocation **does not affect rights previously granted under this license** before revocation.  
+7. License Revocation  
+- The copyright holder reserves the right to revoke this license at any time for entities that violate the terms of use.  
+- Any revocation does not affect rights previously granted under this license before revocation.  
 
-### **8. Restrictions**  
-- The Software **may not** be used for illegal activities or any purpose that infringes upon the rights of others.  
+8. Restrictions  
+- The Software may not be used for illegal activities or any purpose that infringes upon the rights of others.  
 
 ---
 
-This software and its source code remain the **intellectual property of the author**. Any usage outside the conditions outlined in this license requires a separate agreement with the author.  
+This software and its source code remain the intellectual property of the author. Any usage outside the conditions outlined in this license requires a separate agreement with the author.  
 
 ---
