@@ -14,7 +14,6 @@ import getpass
 from pathlib import Path
 from hashlib import sha3_256
 from Crypto.Cipher import AES
-from Crypto.Protocol.KDF import PBKDF2
 import zstandard as zstd
 import brotli
 import qrcode
@@ -22,22 +21,38 @@ from pyzbar.pyzbar import decode
 from PIL import Image
 from tqdm import tqdm
 from concurrent.futures import ThreadPoolExecutor
+from argon2 import PasswordHasher
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 SALT_SIZE = 16
 NONCE_SIZE = 12
-DEFAULT_ITERATIONS = 600000
 COMPRESSION_LEVEL = 19
 QR_SIZE = 200
+
+ARGON2_TIME_COST = 2        
+ARGON2_MEMORY_COST = 102400 
+ARGON2_PARALLELISM = 8      
+ARGON2_HASH_LENGTH = 32    
 
 class SHUMZU:
     def __init__(self, password: str = None, block_size: int = 1024):
         self.password = password
         self.block_size = block_size
+        self.argon2_hasher = PasswordHasher(
+            time_cost=ARGON2_TIME_COST,
+            memory_cost=ARGON2_MEMORY_COST,
+            parallelism=ARGON2_PARALLELISM,
+            hash_len=ARGON2_HASH_LENGTH,
+            salt_len=SALT_SIZE
+        )
 
     def derive_key(self, salt: bytes) -> bytes:
-        return PBKDF2(self.password, salt, dkLen=32, count=DEFAULT_ITERATIONS)
+        if not self.password:
+            raise ValueError("Password is required for key derivation.")
+        password_str = self.password
+        derived_key = self.argon2_hasher.hash(password_str, salt=salt)
+        return derived_key[:ARGON2_HASH_LENGTH]
 
     def encrypt(self, data: bytes) -> str:
         salt, nonce = secrets.token_bytes(SALT_SIZE), secrets.token_bytes(NONCE_SIZE)
