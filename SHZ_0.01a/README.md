@@ -12,7 +12,7 @@ When generating the QR codes, SHUMZU does the following:
 ### **2. QR Code Matrix**
 The QR codes are arranged in a matrix, with each QR code representing one block of the file. The QR code matrix can be saved as a single image and shared or transmitted easily.
 
-### **3. Decoding and Recombining the File**
+### **3. Decoding and Reconstruct the File**
 To decode the file:
 - SHUMZU reads the QR code matrix image.
 - It decodes each QR code into its corresponding block of encrypted data (if applicable).
