@@ -108,14 +108,21 @@ class SHUMZU:
         for obj in decoded_objects:
             try:
                 data = json.loads(obj.data)
-                index, encrypted_data = data['index'], data['data']
+                if not isinstance(data, dict) or 'index' not in data or 'data' not in data:
+                    logging.error(f"Invalid QR block structure: {obj.data}")
+                    continue
+                
+                index = data['index']
+                encrypted_data = data['data']
                 decrypted_data = (
                     self.decompress(self.decrypt(encrypted_data)) if self.password 
                     else self.decompress(base64.b64decode(encrypted_data))
                 )
                 result[index] = decrypted_data
+            except json.JSONDecodeError:
+                logging.error(f"Invalid JSON in QR block: {obj.data}")
             except Exception as e:
-                logging.error(f"Error decoding QR block {data.get('index', '?')}: {e}")
+                logging.error(f"Error decoding QR block: {e}")
         return result
 
     def process_file(self, file_path: str) -> Tuple[bytes, List[bytes]]:
@@ -133,7 +140,7 @@ class SHUMZU:
     def generate_qr_matrix(self, file_path: str, output_path: str):
         """Generates a QR code matrix in parallel."""
         metadata, blocks = self.process_file(file_path)
-        total_blocks = len(blocks) + 1  # Includes metadata
+        total_blocks = len(blocks) + 1
         cols = int(total_blocks ** 0.5)
         rows = (total_blocks + cols - 1) // cols
         
