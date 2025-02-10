@@ -30,7 +30,7 @@ NONCE_SIZE = 12
 DEFAULT_ITERATIONS = 600000
 BLOCK_SIZE = 1024
 COMPRESSION_LEVEL = 19
-QR_SIZE = 321
+QR_SIZE = 200
 
 class SHUMZU:
     def __init__(self, password: str = None):
