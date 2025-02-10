@@ -23,8 +23,12 @@ To decode the file:
 python SHUMZU.py -f <file_path> -o <output_qr_image> 
 ```
 ```bash
+python SHUMZU.py -f <file_path> -o <output_qr_image> -bs 500
+```
+```bash
 python SHUMZU.py -f <output_qr_image> -o <output_file> -d
 ```
+
 
 - **`-f <file_path>`**: The file to convert.
 - **`-o <output_name>`**: Path to save the SHUMZU file. (optional)
