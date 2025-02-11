@@ -48,6 +48,6 @@ python SHUMZU.py -f <output_qr_image> -o <output_file> -d
 
 🔹 **Reason for the adjustment**:  
 - **`1024` for text/code files** → These files are more tolerant of data loss and reconstruction errors.  
-- **`420` or less for more complex files (PDF, images, etc.)** → Reduces errors in decoding and data reconstruction.
+- **`500` or less for more complex files (PDF, images, etc.)** → Reduces errors in decoding and data reconstruction.
 
 ---
