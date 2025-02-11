@@ -181,6 +181,7 @@ class SHUMZU:
             counter += 1
         return path
 
+
 def main():
     parser = argparse.ArgumentParser(description="Generate or decode QR codes from files.")
     parser.add_argument('-f', '--file', help="Input file or QR matrix for decoding", required=True)
@@ -192,8 +193,11 @@ def main():
     args = parser.parse_args()
 
     password = args.password
-    if not args.decode and not password:
-        password = getpass.getpass("Enter password for encryption (leave blank for no encryption): ")
+    if not password:
+        if args.decode:
+            password = getpass.getpass("Enter password for decryption (leave blank for no encryption): ")
+        else:
+            password = getpass.getpass("Enter password for encryption (leave blank for no encryption): ")
     
     shumzu = SHUMZU(password, args.block_size)
     try:
