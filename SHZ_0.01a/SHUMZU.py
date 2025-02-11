@@ -8,6 +8,7 @@ import secrets
 import base64
 import json
 import os
+import time
 import logging
 import argparse
 import getpass
@@ -185,26 +186,23 @@ class SHUMZU:
             raise ValueError("File integrity check failed.")
         
         base_filename = metadata["file_name"]
-        output_file = os.path.join(output_folder, base_filename)
-    
-        counter = 1
-        while os.path.exists(output_file):
-            name, ext = os.path.splitext(base_filename)
-            output_file = os.path.join(output_folder, f"{name}_{counter}{ext}")
-            counter += 1
-    
+        output_file = self._get_unique_filename(os.path.join(output_folder, base_filename))
+        
         Path(output_file).write_bytes(reconstructed_data)
-    
+        
         logging.info(f"File successfully restored to {output_file}")
 
     def _get_unique_filename(self, path: str) -> str:
-        """Generates a unique filename to avoid overwriting."""
+        """Generates a unique filename to avoid overwriting using a timestamp."""
         base, ext = os.path.splitext(path)
-        counter = 1
-        while os.path.exists(path):
-            path = f"{base}_{counter}{ext}"
-            counter += 1
-        return path
+        timestamp = time.strftime("%Y%m%d_%H%M%S")
+        path_with_timestamp = f"{base}_{timestamp}{ext}"
+        
+        while os.path.exists(path_with_timestamp):
+            timestamp = time.strftime("%Y%m%d_%H%M%S")
+            path_with_timestamp = f"{base}_{timestamp}{ext}"
+        
+        return path_with_timestamp
 
 def main():
     parser = argparse.ArgumentParser(description="Generate or decode QR codes from files.")
