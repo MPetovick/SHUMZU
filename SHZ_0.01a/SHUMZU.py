@@ -163,14 +163,39 @@ class SHUMZU:
             raise FileNotFoundError(f"The image {image_path} does not exist.")
         
         decoded_data = self.decode_qr(Image.open(image_path))
-        metadata, file_data = json.loads(decoded_data[0].decode()), b''.join(decoded_data[idx] for idx in sorted(decoded_data) if idx)
         
-        if metadata["hash"] != sha3_256(file_data).hexdigest():
+        if 0 not in decoded_data:
+            raise ValueError("Metadata block missing from QR matrix.")
+        
+        metadata = json.loads(decoded_data[0].decode())
+        total_blocks = len(decoded_data) - 1
+        
+        reconstructed_data = bytearray()
+        
+        logging.info("Reconstructing file from QR codes...")
+        
+        with tqdm(total=total_blocks, desc="Reconstructing", unit="block") as pbar:
+            for idx in sorted(decoded_data.keys()):
+                if idx == 0:
+                    continue
+                reconstructed_data.extend(decoded_data[idx])
+                pbar.update(1)
+        
+        if metadata["hash"] != sha3_256(reconstructed_data).hexdigest():
             raise ValueError("File integrity check failed.")
         
-        output_file = self._get_unique_filename(os.path.join(output_folder, metadata["file_name"]))
-        Path(output_file).write_bytes(file_data)
-        logging.info(f"File restored to {output_file}")
+        base_filename = metadata["file_name"]
+        output_file = os.path.join(output_folder, base_filename)
+    
+        counter = 1
+        while os.path.exists(output_file):
+            name, ext = os.path.splitext(base_filename)
+            output_file = os.path.join(output_folder, f"{name}_{counter}{ext}")
+            counter += 1
+    
+        Path(output_file).write_bytes(reconstructed_data)
+    
+        logging.info(f"File successfully restored to {output_file}")
 
     def _get_unique_filename(self, path: str) -> str:
         """Generates a unique filename to avoid overwriting."""
@@ -180,7 +205,6 @@ class SHUMZU:
             path = f"{base}_{counter}{ext}"
             counter += 1
         return path
-
 
 def main():
     parser = argparse.ArgumentParser(description="Generate or decode QR codes from files.")
