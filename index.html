@@ -202,8 +202,11 @@
         let stream = null;
         let scanning = false;
 
-        // Inicializar con overlay activo
-        cameraContainer.classList.add('active');
+        // Estado inicial correcto
+        const initializeCameraState = () => {
+            cameraContainer.classList.remove('active'); // Asegurar overlay visible al inicio
+        };
+        initializeCameraState();
 
         const toggleCamera = async () => {
             if (stream) {
@@ -211,11 +214,11 @@
                 stream.getTracks().forEach(track => track.stop());
                 video.srcObject = null;
                 scanning = false;
-                cameraContainer.classList.remove('active');
+                cameraContainer.classList.remove('active'); // Mostrar overlay
             } else {
                 try {
                     // Activar cámara
-                    cameraContainer.classList.add('active');
+                    cameraContainer.classList.add('active'); // Ocultar overlay
                     stream = await navigator.mediaDevices.getUserMedia({
                         video: {
                             facingMode: 'environment',
@@ -228,7 +231,7 @@
                     startQRScan();
                 } catch (err) {
                     console.error('Camera error:', err);
-                    cameraContainer.classList.remove('active');
+                    cameraContainer.classList.remove('active'); // Mostrar overlay si hay error
                 }
             }
         };
