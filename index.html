@@ -53,6 +53,7 @@
             overflow: hidden;
             box-shadow: 0 0 30px rgba(0, 243, 255, 0.1);
             cursor: pointer;
+            transition: all 0.3s ease;
         }
 
         #video {
@@ -60,6 +61,59 @@
             height: 100%;
             object-fit: cover;
         }
+
+        .inactive-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(10, 10, 15, 0.95);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 1;
+            transition: opacity 0.3s ease;
+        }
+
+        .camera-container.active .inactive-overlay {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .fingerprint {
+            width: 50%;
+            height: 50%;
+            opacity: 0.8;
+            animation: fingerprint-pulse 2s infinite;
+        }
+
+        .scanning-lines {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+
+        .scanning-lines .line {
+            position: absolute;
+            width: 100%;
+            height: 2px;
+            background: linear-gradient(
+                to right,
+                transparent 0%,
+                var(--neon-cyan) 50%,
+                transparent 100%
+            );
+            animation: scan 2s infinite;
+            opacity: 0.3;
+        }
+
+        .scanning-lines .line:nth-child(1) { animation-delay: 0s; top: 25% }
+        .scanning-lines .line:nth-child(2) { animation-delay: 0.3s; top: 50% }
+        .scanning-lines .line:nth-child(3) { animation-delay: 0.6s; top: 75% }
 
         .social-container {
             display: flex;
@@ -84,6 +138,16 @@
             50% { transform: translateY(-8px); }
         }
 
+        @keyframes fingerprint-pulse {
+            0%, 100% { transform: scale(1); opacity: 0.6; }
+            50% { transform: scale(1.1); opacity: 1; }
+        }
+
+        @keyframes scan {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
+        }
+
         @media (max-width: 480px) {
             body { padding: 0.5rem; }
             .logo-container { margin: 0.5rem 0; }
@@ -101,16 +165,30 @@
 
     <div class="camera-container" id="cameraContainer">
         <video id="video" autoplay playsinline></video>
+        <div class="inactive-overlay" id="inactiveOverlay">
+            <svg class="fingerprint" viewBox="0 0 100 100">
+                <path d="M50 10 Q60 20 50 30 Q40 20 50 10" stroke="var(--neon-cyan)" stroke-width="2" fill="none"/>
+                <path d="M30 20 Q40 30 50 40 Q60 30 70 20" stroke="var(--neon-cyan)" stroke-width="2" fill="none"/>
+                <path d="M20 30 Q30 40 40 50 Q50 40 60 30" stroke="var(--neon-cyan)" stroke-width="2" fill="none"/>
+                <path d="M10 40 Q20 50 30 60 Q40 50 50 40" stroke="var(--neon-cyan)" stroke-width="2" fill="none"/>
+                <path d="M60 40 Q70 50 80 60 Q90 50 90 40" stroke="var(--neon-cyan)" stroke-width="2" fill="none"/>
+            </svg>
+            <div class="scanning-lines">
+                <div class="line"></div>
+                <div class="line"></div>
+                <div class="line"></div>
+            </div>
+        </div>
     </div>
 
     <div class="social-container">
-        <a href="https://t.me/SHUMZUbot" target="_blank" class="social-icon">
+        <a href="https://t.me/tucanal" target="_blank" class="social-icon">
             <svg viewBox="0 0 24 24" fill="var(--neon-cyan)">
                 <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 8.221l-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.446 1.394c-.14.14-.26.258-.534.258l.198-2.76 5.518-4.986c.22-.198-.048-.308-.346-.11l-6.816 4.29-2.96-.924c-.64-.203-.658-.64.135-.954l11.566-4.458c.538-.196 1.006.128.832.941z"/>
             </svg>
         </a>
         
-        <a href="https://github.com/mpetovick/SHUMZU" target="_blank" class="social-icon">
+        <a href="https://github.com/tuusuario/shumzu" target="_blank" class="social-icon">
             <svg viewBox="0 0 24 24" fill="var(--neon-cyan)">
                 <path d="M12 0C5.373 0 0 5.373 0 12c0 5.302 3.438 9.8 8.207 11.387.6.113.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23A11.509 11.509 0 0112 5.803c1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576C20.566 21.797 24 17.3 24 12c0-6.627-5.373-12-12-12z"/>
             </svg>
@@ -124,13 +202,20 @@
         let stream = null;
         let scanning = false;
 
+        // Inicializar con overlay activo
+        cameraContainer.classList.add('active');
+
         const toggleCamera = async () => {
             if (stream) {
+                // Desactivar cámara
                 stream.getTracks().forEach(track => track.stop());
                 video.srcObject = null;
                 scanning = false;
+                cameraContainer.classList.remove('active');
             } else {
                 try {
+                    // Activar cámara
+                    cameraContainer.classList.add('active');
                     stream = await navigator.mediaDevices.getUserMedia({
                         video: {
                             facingMode: 'environment',
@@ -143,6 +228,7 @@
                     startQRScan();
                 } catch (err) {
                     console.error('Camera error:', err);
+                    cameraContainer.classList.remove('active');
                 }
             }
         };
