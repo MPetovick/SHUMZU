@@ -53,7 +53,6 @@
             overflow: hidden;
             box-shadow: 0 0 30px rgba(0, 243, 255, 0.1);
             cursor: pointer;
-            transition: all 0.3s ease;
         }
 
         #video {
@@ -72,13 +71,6 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            opacity: 1;
-            transition: opacity 0.3s ease;
-        }
-
-        .camera-container.active .inactive-overlay {
-            opacity: 0;
-            pointer-events: none;
         }
 
         .fingerprint {
@@ -199,14 +191,12 @@
     <script>
         const video = document.getElementById('video');
         const cameraContainer = document.getElementById('cameraContainer');
+        const inactiveOverlay = document.getElementById('inactiveOverlay');
         let stream = null;
         let scanning = false;
 
-        // Estado inicial correcto
-        const initializeCameraState = () => {
-            cameraContainer.classList.remove('active'); // Asegurar overlay visible al inicio
-        };
-        initializeCameraState();
+        // Estado inicial
+        inactiveOverlay.style.display = 'flex';
 
         const toggleCamera = async () => {
             if (stream) {
@@ -214,11 +204,11 @@
                 stream.getTracks().forEach(track => track.stop());
                 video.srcObject = null;
                 scanning = false;
-                cameraContainer.classList.remove('active'); // Mostrar overlay
+                inactiveOverlay.style.display = 'flex';
             } else {
                 try {
-                    // Activar cámara
-                    cameraContainer.classList.add('active'); // Ocultar overlay
+                    // Ocultar overlay y activar cámara
+                    inactiveOverlay.style.display = 'none';
                     stream = await navigator.mediaDevices.getUserMedia({
                         video: {
                             facingMode: 'environment',
@@ -231,7 +221,7 @@
                     startQRScan();
                 } catch (err) {
                     console.error('Camera error:', err);
-                    cameraContainer.classList.remove('active'); // Mostrar overlay si hay error
+                    inactiveOverlay.style.display = 'flex';
                 }
             }
         };
