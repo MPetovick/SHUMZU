@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SHUMZU - Secure QR Transfer</title>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --neon-cyan: #00f3ff;
+            --dark-bg: #0a0a0f;
+        }
+
+        body {
+            margin: 0;
+            padding: 2rem;
+            background: var(--dark-bg);
+            font-family: 'Space Grotesk', sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            color: #fff;
+            text-align: center;
+        }
+
+        .logo-container {
+            margin: 2rem 0;
+            animation: float 3s ease-in-out infinite;
+        }
+
+        #logo {
+            width: 200px;
+            filter: drop-shadow(0 0 15px var(--neon-cyan));
+        }
+
+        .camera-container {
+            position: relative;
+            width: 90%;
+            max-width: 600px;
+            margin: 2rem 0;
+            border: 2px solid var(--neon-cyan);
+            border-radius: 15px;
+            overflow: hidden;
+            box-shadow: 0 0 30px rgba(0, 243, 255, 0.1);
+        }
+
+        #video {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+
+        .repo-link {
+            margin-top: 2rem;
+            padding: 1rem 2rem;
+            color: var(--neon-cyan);
+            text-decoration: none;
+            border: 2px solid var(--neon-cyan);
+            border-radius: 8px;
+            transition: all 0.3s ease;
+        }
+
+        .repo-link:hover {
+            background: rgba(0, 243, 255, 0.1);
+            transform: translateY(-2px);
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+
+        @media (max-width: 768px) {
+            body {
+                padding: 1rem;
+            }
+            
+            .camera-container {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="logo-container">
+        <img id="logo" src="shumzu-logo.png" alt="SHUMZU Logo">
+        <h1>SHUMZU QUANTUM TRANSFER</h1>
+    </div>
+
+    <div class="camera-container">
+        <video id="video" autoplay playsinline></video>
+    </div>
+
+    <a href="https://github.com/tu-usuario/shumzu" class="repo-link" target="_blank">
+        GitHub Repository
+    </a>
+
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+    <script>
+        const video = document.getElementById('video');
+        
+        // Inicializar cámara
+        async function initCamera() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: {
+                        facingMode: 'environment',
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 }
+                    }
+                });
+                video.srcObject = stream;
+                video.play();
+                startQRScan();
+            } catch (err) {
+                console.error('Error accessing camera:', err);
+            }
+        }
+
+        // Escanear QR
+        function startQRScan() {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+
+            function scan() {
+                if (video.readyState === video.HAVE_ENOUGH_DATA) {
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+                    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                    
+                    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                    const code = jsQR(imageData.data, imageData.width, imageData.height);
+                    
+                    if (code) {
+                        console.log('QR detected:', code.data);
+                    }
+                }
+                requestAnimationFrame(scan);
+            }
+            scan();
+        }
+
+        initCamera();
+    </script>
+</body>
+</html>
