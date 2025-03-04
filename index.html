@@ -79,7 +79,7 @@
     </div>
 
     <h2>Secure data solution combining compression, encryption, and QR codes for efficient transmission</h2>
-    
+
     <div class="camera-container" id="cameraContainer">
         <video id="video" autoplay playsinline></video>
     </div>
@@ -87,7 +87,9 @@
     <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
     <script>
         const video = document.getElementById('video');
-        let stream = null, scanning = false;
+        const cameraContainer = document.getElementById('cameraContainer');
+        let stream = null;
+        let scanning = false;
 
         const toggleCamera = async () => {
             if (stream) {
@@ -119,21 +121,26 @@
 
             const scanFrame = () => {
                 if (!scanning) return;
-                
+
                 canvas.width = video.videoWidth;
                 canvas.height = video.videoHeight;
                 ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-                
-                const code = jsQR(ctx.getImageData(0, 0, canvas.width, canvas.height).data,
-                      code && console.log('QR detected:', code.data);
-                
+
+                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                const code = jsQR(imageData.data, canvas.width, canvas.height);
+                if (code) console.log('QR detected:', code.data);
+
                 requestAnimationFrame(scanFrame);
             };
             scanFrame();
         };
 
         cameraContainer.addEventListener('click', toggleCamera);
-        window.addEventListener('beforeunload', () => stream && toggleCamera());
+        window.addEventListener('beforeunload', () => {
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+            }
+        });
     </script>
 </body>
 </html>
