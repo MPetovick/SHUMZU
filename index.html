@@ -24,13 +24,21 @@
             text-align: center;
         }
 
+        h2 {
+            color: var(--neon-cyan);
+            text-shadow: 0 0 10px var(--neon-cyan);
+            margin-bottom: 1rem;
+            font-size: 1.5rem;
+        }
+
         .logo-container {
             margin: 2rem 0;
             animation: float 3s ease-in-out infinite;
         }
 
         #logo {
-            width: 200px;
+            width: 30vw;
+            max-width: 200px;
             filter: drop-shadow(0 0 15px var(--neon-cyan));
         }
 
@@ -38,7 +46,8 @@
             position: relative;
             width: 90%;
             max-width: 600px;
-            margin: 2rem 0;
+            aspect-ratio: 1 / 1;
+            margin: 2rem auto;
             border: 2px solid var(--neon-cyan);
             border-radius: 15px;
             overflow: hidden;
@@ -47,7 +56,8 @@
 
         #video {
             width: 100%;
-            height: auto;
+            height: 100%;
+            object-fit: cover;
             display: block;
         }
 
@@ -75,9 +85,19 @@
             body {
                 padding: 1rem;
             }
-            
+
+            h2 {
+                font-size: 1.2rem;
+            }
+
             .camera-container {
                 width: 100%;
+                max-width: none;
+            }
+
+            #logo {
+                width: 50vw;
+                max-width: 150px;
             }
         }
     </style>
@@ -87,18 +107,19 @@
         <img id="logo" src="rsc/logo_SHUMZU.png" alt="SHUMZU Logo">
     </div>
 
+    <h2>SHUMZU</h2>
     <div class="camera-container">
         <video id="video" autoplay playsinline></video>
     </div>
 
-    <a href="https://github.com/tu-usuario/shumzu" class="repo-link" target="_blank">
+    <a href="https://github.com/mpetovick/SHUMZU" class="repo-link" target="_blank">
         GitHub Repository
     </a>
 
     <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
     <script>
         const video = document.getElementById('video');
-        
+
         // Inicializar cámara
         async function initCamera() {
             try {
@@ -122,22 +143,21 @@
             const canvas = document.createElement('canvas');
             const ctx = canvas.getContext('2d');
 
-            function scan() {
+            setInterval(() => {
                 if (video.readyState === video.HAVE_ENOUGH_DATA) {
                     canvas.width = video.videoWidth;
                     canvas.height = video.videoHeight;
                     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-                    
+
                     const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
                     const code = jsQR(imageData.data, imageData.width, imageData.height);
-                    
+
                     if (code) {
                         console.log('QR detected:', code.data);
+                        // Aquí puedes manejar el código QR detectado
                     }
                 }
-                requestAnimationFrame(scan);
-            }
-            scan();
+            }, 100);
         }
 
         initCamera();
