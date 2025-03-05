@@ -52,7 +52,7 @@
             border-radius: 15px;
             overflow: hidden;
             box-shadow: 0 0 30px rgba(0, 243, 255, 0.1);
-            cursor: default; /* Cambiar de pointer a default */
+            cursor: default;
             transition: all 0.3s ease;
         }
 
@@ -60,7 +60,7 @@
             width: 100%;
             height: 100%;
             object-fit: cover;
-            transform: scale(1.01); /* Elimina bordes residuales */
+            transform: scale(1.01);
         }
 
         .inactive-overlay {
@@ -75,15 +75,13 @@
             justify-content: center;
             opacity: 1;
             visibility: visible;
-            transition: all 0.3s ease;
+            transition: opacity 0.3s ease; /* Transición solo en opacity */
             pointer-events: none;
         }
 
         .camera-container.active .inactive-overlay {
             opacity: 0;
-            visibility: hidden;
-            display: none; /* Asegura que el overlay desaparezca por completo */
-
+            visibility: hidden; /* Sin display: none para permitir la transición */
         }
 
         .fingerprint {
@@ -229,12 +227,7 @@
                         }
                     });
                     video.srcObject = stream;
-
-                    // Esperar a que el video esté listo
-                    video.onplaying = () => {
-                        cameraContainer.classList.add('ready');
-                    };
-
+                    video.play(); // Asegurarse de que el video se reproduzca
                     startQRScan();
                 } catch (err) {
                     console.error('Error al activar la cámara:', err);
@@ -265,11 +258,6 @@
         };
 
         cameraContainer.addEventListener('click', toggleCamera);
-
-        // Manejar el fin del stream cuando el video se pausa
-        video.addEventListener('pause', () => {
-            cameraContainer.classList.remove('active');
-        });
 
         window.addEventListener('beforeunload', () => {
             if (stream) {
