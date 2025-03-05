@@ -53,14 +53,12 @@
             overflow: hidden;
             box-shadow: 0 0 30px rgba(0, 243, 255, 0.1);
             cursor: default;
-            transition: all 0.3s ease;
         }
 
         #video {
             width: 100%;
             height: 100%;
             object-fit: cover;
-            transform: scale(1.01);
         }
 
         .inactive-overlay {
@@ -73,15 +71,14 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            opacity: 1;
-            visibility: visible;
-            transition: opacity 0.3s ease; /* Transición solo en opacity */
+            transition: opacity 0.3s ease, visibility 0s linear 0.3s;
             pointer-events: none;
         }
 
         .camera-container.active .inactive-overlay {
             opacity: 0;
-            visibility: hidden; /* Sin display: none para permitir la transición */
+            visibility: hidden;
+            transition: opacity 0.3s ease, visibility 0s linear;
         }
 
         .fingerprint {
@@ -114,10 +111,6 @@
             opacity: 0.3;
         }
 
-        .scanning-lines .line:nth-child(1) { animation-delay: 0s; top: 25%; }
-        .scanning-lines .line:nth-child(2) { animation-delay: 0.3s; top: 50%; }
-        .scanning-lines .line:nth-child(3) { animation-delay: 0.6s; top: 75%; }
-
         .social-container {
             display: flex;
             gap: 2rem;
@@ -129,11 +122,6 @@
             height: 40px;
             transition: all 0.3s ease;
             filter: drop-shadow(0 0 5px var(--neon-cyan));
-        }
-
-        .social-icon:hover {
-            transform: translateY(-3px);
-            filter: drop-shadow(0 0 10px var(--neon-cyan));
         }
 
         @keyframes float {
@@ -153,8 +141,6 @@
 
         @media (max-width: 480px) {
             body { padding: 0.5rem; }
-            .logo-container { margin: 0.5rem 0; }
-            h2 { margin: 0 0.5rem 0.5rem; }
             .social-container { gap: 1.5rem; }
         }
     </style>
@@ -190,7 +176,6 @@
                 <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 8.221l-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.446 1.394c-.14.14-.26.258-.534.258l.198-2.76 5.518-4.986c.22-.198-.048-.308-.346-.11l-6.816 4.29-2.96-.924c-.64-.203-.658-.64.135-.954l11.566-4.458c.538-.196 1.006.128.832.941z"/>
             </svg>
         </a>
-
         <a href="https://github.com/mpetovick/SHUMZU" target="_blank" class="social-icon">
             <svg viewBox="0 0 24 24" fill="var(--neon-cyan)">
                 <path d="M12 0C5.373 0 0 5.373 0 12c0 5.302 3.438 9.8 8.207 11.387.6.113.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23A11.509 11.509 0 0112 5.803c1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576C20.566 21.797 24 17.3 24 12c0-6.627-5.373-12-12-12z"/>
@@ -200,70 +185,88 @@
 
     <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
     <script>
-        const video = document.getElementById('video');
-        const cameraContainer = document.getElementById('cameraContainer');
-        let stream = null;
-        let scanning = false;
+        class QRScanner {
+            constructor() {
+                this.video = document.getElementById('video');
+                this.cameraContainer = document.getElementById('cameraContainer');
+                this.inactiveOverlay = document.getElementById('inactiveOverlay');
+                this.stream = null;
+                this.scanning = false;
+                this.init();
+            }
 
-        // Estado inicial: overlay visible
-        cameraContainer.classList.remove('active');
+            init() {
+                this.cameraContainer.addEventListener('click', () => this.toggleCamera());
+                window.addEventListener('beforeunload', () => this.cleanup());
+            }
 
-        const toggleCamera = async () => {
-            if (stream) {
-                // Desactivar cámara
-                stream.getTracks().forEach(track => track.stop());
-                stream = null;
-                video.srcObject = null;
-                scanning = false;
-                cameraContainer.classList.remove('active');
-            } else {
+            async toggleCamera() {
+                if (this.stream) {
+                    this.stopCamera();
+                } else {
+                    await this.startCamera();
+                }
+            }
+
+            async startCamera() {
                 try {
-                    cameraContainer.classList.add('active');
-                    stream = await navigator.mediaDevices.getUserMedia({
+                    this.cameraContainer.classList.add('active');
+                    this.stream = await navigator.mediaDevices.getUserMedia({
                         video: {
                             facingMode: 'environment',
                             width: { ideal: Math.min(window.innerWidth, 1280) },
                             height: { ideal: Math.min(window.innerHeight, 720) }
                         }
                     });
-                    video.srcObject = stream;
-                    video.play(); // Asegurarse de que el video se reproduzca
-                    startQRScan();
-                } catch (err) {
-                    console.error('Error al activar la cámara:', err);
-                    cameraContainer.classList.remove('active');
+                    this.video.srcObject = this.stream;
+                    await this.video.play();
+                    this.startQRScan();
+                } catch (error) {
+                    console.error('Error accessing camera:', error);
+                    this.cameraContainer.classList.remove('active');
                 }
             }
-        };
 
-        const startQRScan = () => {
-            const canvas = document.createElement('canvas');
-            const ctx = canvas.getContext('2d');
-            scanning = true;
-
-            const scanFrame = () => {
-                if (!scanning) return;
-
-                canvas.width = video.videoWidth;
-                canvas.height = video.videoHeight;
-                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-                const code = jsQR(imageData.data, canvas.width, canvas.height);
-                if (code) console.log('QR detectado:', code.data);
-
-                requestAnimationFrame(scanFrame);
-            };
-            scanFrame();
-        };
-
-        cameraContainer.addEventListener('click', toggleCamera);
-
-        window.addEventListener('beforeunload', () => {
-            if (stream) {
-                stream.getTracks().forEach(track => track.stop());
+            stopCamera() {
+                this.scanning = false;
+                this.stream.getTracks().forEach(track => track.stop());
+                this.stream = null;
+                this.video.srcObject = null;
+                this.cameraContainer.classList.remove('active');
             }
-        });
+
+            startQRScan() {
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                this.scanning = true;
+
+                const scanFrame = () => {
+                    if (!this.scanning) return;
+
+                    canvas.width = this.video.videoWidth;
+                    canvas.height = this.video.videoHeight;
+                    ctx.drawImage(this.video, 0, 0, canvas.width, canvas.height);
+
+                    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                    const code = jsQR(imageData.data, canvas.width, canvas.height);
+                    
+                    if (code) {
+                        console.log('QR Code detected:', code.data);
+                        // Handle detected QR code here
+                    }
+
+                    requestAnimationFrame(scanFrame);
+                };
+                scanFrame();
+            }
+
+            cleanup() {
+                if (this.stream) this.stopCamera();
+            }
+        }
+
+        // Initialize scanner when DOM is loaded
+        document.addEventListener('DOMContentLoaded', () => new QRScanner());
     </script>
 </body>
 </html>
