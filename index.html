@@ -1,67 +1,202 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="en">
 <head>
+    <!-- Meta Tags -->
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SHUMZU - Secure QR Transfer</title>
-    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600&display=swap" rel="stylesheet">
+    <meta name="description" content="HUSHBOX is a privacy-focused tool for secure messaging using advanced encryption and QR codes. Simple and functional, it requires both users to share a password externally for secure transmission. Built upon SHUMZU.">
+
+    <!-- Title and Icons -->
+    <title>HushBox - Secure Messaging with QR</title>
+    <link rel="icon" href="/HUSHBOX/favicon.ico" type="image/x-icon">
+    <link rel="icon" href="/HUSHBOX/assets/favicon.png" type="image/png" sizes="any">
+    <link rel="icon" href="/HUSHBOX/assets/icons/android-icon-192x192.png" type="image/png" sizes="192x192">
+    <link rel="apple-touch-icon" href="/HUSHBOX/assets/apple-touch-icon-180x180.png" sizes="180x180">
+    <link rel="apple-touch-icon" href="/HUSHBOX/assets/apple-touch-icon-152x152.png" sizes="152x152">
+    <link rel="apple-touch-icon" href="/HUSHBOX/assets/apple-touch-icon-120x120.png" sizes="120x120">
+    <link rel="manifest" href="/HUSHBOX/manifest.json">
+
+    <!-- Stylesheets -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-    <header class="logo-container">
-        <img id="logo" src="rsc/logo_SHUMZU.png" alt="SHUMZU Logo">
+    <!-- Header -->
+    <header class="header">
+        <h1 class="logo">
+            <a href="https://github.com/MPetovick/HUSHBOX/blob/main/README.md" target="_blank" class="lock-icon" title="Learn more about HushBox">
+                <i class="fas fa-lock"></i>
+            </a> 
+            HUSH<span class="white-text">B</span><i class="fas fa-qrcode qr-icon"></i><span class="white-text">X</span>
+        </h1>
+        <a href="#" id="login-icon" class="login-icon" title="Login" aria-label="Login">
+            <i class="fas fa-user-circle"></i>
+        </a>
     </header>
 
-    <main>
-        <h2>Secure data solution combining compression, encryption, and QR codes for efficient transmission</h2>
+    <!-- Contenido Principal -->
+    <div class="container">
+        <div class="main-grid">
+            <!-- Sección de Cifrado -->
+            <div class="section encrypt-section">
+                <div class="input-group">
+                    <input type="password" id="passphrase" placeholder="Enter your secret passphrase" required aria-label="Secret passphrase">
+                    <i class="fas fa-key icon"></i>
+                    <i class="fas fa-dice icon generate-password" title="Generate secure passphrase" role="button" tabindex="0"></i>
+                </div>
+                <div class="input-group">
+                    <textarea id="message-input" placeholder="Write your secure message..." rows="4" maxlength="4000" aria-label="Secure message"></textarea>
+                    <i class="fas fa-comment-dots icon"></i>
+                    <div id="char-counter" class="char-counter">0/4000</div>
+                </div>
 
-        <div class="camera-container" id="cameraContainer">
-            <video id="video" autoplay playsinline></video>
-            <div class="inactive-overlay" id="inactiveOverlay">
-                <svg class="fingerprint" viewBox="0 0 100 100">
-                    <path d="M50 10 Q60 20 50 30 Q40 20 50 10" stroke="var(--neon-cyan)" stroke-width="2" fill="none"/>
-                    <path d="M30 20 Q40 30 50 40 Q60 30 70 20" stroke="var(--neon-cyan)" stroke-width="2" fill="none"/>
-                    <path d="M20 30 Q30 40 40 50 Q50 40 60 30" stroke="var(--neon-cyan)" stroke-width="2" fill="none"/>
-                    <path d="M10 40 Q20 50 30 60 Q40 50 50 40" stroke="var(--neon-cyan)" stroke-width="2" fill="none"/>
-                    <path d="M60 40 Q70 50 80 60 Q90 50 90 40" stroke="var(--neon-cyan)" stroke-width="2" fill="none"/>
-                </svg>
-                <div class="scanning-lines">
-                    <div class="line"></div>
-                    <div class="line"></div>
-                    <div class="line"></div>
+                <!-- Botones de acción con íconos -->
+                <div class="button-group">
+                    <button id="upload-arrow-button" class="btn-icon" title="Upload Image" aria-label="Upload image">
+                        <i class="fas fa-arrow-up"></i>
+                    </button>
+                    <button id="scan-button" class="btn-icon" title="Scan QR" aria-label="Scan QR code">
+                        <i class="fas fa-camera"></i>
+                    </button>
+                    <button id="image-button" class="btn-icon" title="Upload QR Image" disabled aria-label="Upload QR image (coming soon)">
+                        <i class="fas fa-image"></i>
+                    </button>
+                    <button id="pdf-button" class="btn-icon" title="Upload PDF" disabled aria-label="Upload PDF (coming soon)">
+                        <i class="fas fa-file-pdf"></i>
+                    </button>
+                    <!-- Mensaje "Coming Soon" -->
+                    <div id="coming-soon-message" class="hidden">
+                        <p>Coming Soon!</p>
+                    </div>
+                </div>
+
+                <!-- Modal de Cámara QR -->
+                <div id="camera-modal" class="camera-modal hidden" role="dialog" aria-labelledby="camera-modal-title">
+                    <div class="camera-modal-content">
+                        <div class="camera-header">
+                            <h3 id="camera-modal-title"><i class="fas fa-qrcode"></i> Escanear QR</h3>
+                            <button id="close-camera" class="btn-secondary close-camera" aria-label="Close camera modal">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                        <div class="camera-body">
+                            <video id="camera-preview" autoplay playsinline aria-label="Camera preview"></video>
+                            <div class="camera-actions">
+                                <button class="btn-primary" id="capture-btn" aria-label="Capture QR code">
+                                    <i class="fas fa-camera"></i> Capturar
+                                </button>
+                                <label class="btn-primary upload-label">
+                                    <input type="file" accept="image/*" hidden id="qr-upload" aria-label="Upload QR image">
+                                    <i class="fas fa-upload"></i> Cargar
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Botones Encrypt y Decrypt en la misma fila -->
+                <div class="action-buttons">
+                    <button id="send-button" class="btn-primary">
+                        <i class="fas fa-lock"></i> Encrypt
+                    </button>
+                    <button id="decode-button" class="btn-primary" disabled>
+                        <i class="fas fa-unlock"></i> Decrypt
+                    </button>
+                </div>
+
+                <!-- Contenedor del QR -->
+                <div id="qr-container" class="hidden">
+                    <div class="qr-header">
+                        <h3><i class="fas fa-qrcode"></i> Secure QR</h3>
+                        <div class="qr-actions">
+                            <button id="download-button" class="btn-secondary" aria-label="Download QR code">
+                                <i class="fas fa-arrow-down"></i>
+                            </button>
+                            <button id="share-button" class="btn-secondary" aria-label="Share QR code">
+                                <i class="fas fa-share-alt"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <canvas id="qr-canvas" aria-label="Generated QR code with encrypted message"></canvas>
+                </div>
+            </div>
+
+            <!-- Sección de Descifrado -->
+            <div class="section decrypt-section">
+                <div id="messages" class="message-container" role="log" aria-live="polite">
+                    <div class="message-placeholder">
+                        <i class="fas fa-comments"></i>
+                        <p>Encrypted & Decrypted messages appear here</p>
+                    </div>
                 </div>
             </div>
         </div>
+    </div>
 
-        <div id="progressContainer" class="progress-container">
-            <p id="progressText">Scanning QR: 0 detected</p>
-            <div class="progress-bar">
-                <div id="progressBar" class="progress-fill"></div>
-            </div>
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="social-icons">
+            <a href="https://t.me/HUSHBOX_QR" target="_blank" class="btn-icon social-icon telegram" title="Telegram" aria-label="Visit HushBox Telegram">
+                <i class="fab fa-telegram-plane"></i>
+            </a>
+            <a href="https://twitter.com/HUSHBOXonline" target="_blank" class="btn-icon social-icon twitter" title="Twitter" aria-label="Visit HushBox Twitter">
+                <i class="fab fa-twitter"></i>
+            </a>
         </div>
-
-        <button id="reconstructButton" class="shumzu-button">SHUMZU</button>
-    </main>
-
-    <footer class="social-container">
-        <a href="https://t.me/SHUMZUbot" target="_blank" class="social-icon" aria-label="Telegram">
-            <svg viewBox="0 0 24 24" fill="var(--neon-cyan)">
-                <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 8.221l-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.446 1.394c-.14.14-.26.258-.534.258l.198-2.76 5.518-4.986c.22-.198-.048-.308-.346-.11l-6.816 4.29-2.96-.924c-.64-.203-.658-.64.135-.954l11.566-4.458c.538-.196 1.006.128.832.941z"/>
-            </svg>
-        </a>
-        <a href="https://github.com/mpetovick/SHUMZU" target="_blank" class="social-icon" aria-label="GitHub">
-            <svg viewBox="0 0 24 24" fill="var(--neon-cyan)">
-                <path d="M12 0C5.373 0 0 5.373 0 12c0 5.302 3.438 9.8 8.207 11.387.6.113.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23A11.509 11.509 0 0112 5.803c1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576C20.566 21.797 24 17.3 24 12c0-6.627-5.373-12-12-12z"/>
-            </svg>
-        </a>
+        <p>© 2025 HushBox. All rights reserved.</p>
+        <a href="#" target="_blank">Privacy Policy</a>
     </footer>
 
+    <!-- Modal de tutorial -->
+    <div id="tutorial-modal" class="modal" role="dialog" aria-labelledby="tutorial-modal-title">
+        <div class="modal-content">
+            <span class="close-modal" id="close-tutorial" aria-label="Close tutorial modal">×</span>
+            <div class="modal-header">
+                <h2 id="tutorial-modal-title"><i class="fas fa-lock"></i>HUSHBOX</h2>
+                <p class="modal-subtitle">Your Digital Privacy Vault</p>
+            </div>
+            <div class="modal-body">
+                <div class="feature-grid">
+                    <div class="feature-item">
+                        <i class="fas fa-shield-alt feature-icon"></i>
+                        <h3>Zero-Server Security</h3>
+                        <p>Messages never touch external servers, ensuring true privacy.</p>
+                    </div>
+                    <div class="feature-item">
+                        <i class="fas fa-qrcode feature-icon"></i>
+                        <h3>QR Encryption</h3>
+                        <p>Advanced AES-256-GCM encryption with QR code delivery.</p>
+                    </div>
+                    <div class="feature-item">
+                        <i class="fas fa-mobile-alt feature-icon"></i>
+                        <h3>Mobile-Ready</h3>
+                        <p>Install as a PWA for seamless use on any device.</p>
+                    </div>
+                    <div class="feature-item">
+                        <i class="fas fa-user-secret feature-icon"></i>
+                        <h3>Complete Anonymity</h3>
+                        <p>No metadata or tracking—your identity stays hidden.</p>
+                    </div>
+                </div>
+                <div class="security-tip">
+                    <i class="fas fa-info-circle"></i>
+                    <p><strong>Pro Tip:</strong> Share your passphrase via a secure channel (e.g., Signal) separately from the QR code for maximum security.</p>
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button id="close-tutorial-btn" class="btn-primary">Start Securing Now</button>
+                <label class="disable-toggle">
+                    <input type="checkbox" id="dont-show-again" aria-label="Don't show this tutorial again">
+                    Don’t show this again
+                </label>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
-    <script src="https://unpkg.com/argon2-browser@1.18.0/dist/argon2.js"></script>
-    <script src="https://unpkg.com/js-sha3@0.8.0/build/sha3.min.js"></script>
-    <script src="https://unpkg.com/zstd-js@0.2.1/dist/zstd.min.js"></script>
-    <script src="https://unpkg.com/brotli-decompress-js@1.0.0/brotli-decompress.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
     <script src="script.js"></script>
 </body>
 </html>
-
