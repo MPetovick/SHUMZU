@@ -24,19 +24,33 @@
         <div class="buttons">
           <button id="open-camera" class="btn-primary">📷 Abrir Cámara</button>
           <label for="file-input" class="btn-secondary">📂 Subir Imágenes QR</label>
-          <input type="file" id="file-input" accept="image/*" multiple>
+          <input type="file" id="file-input" accept="image/*,video/*,.gif" multiple>
           <button id="reconstruct-btn" class="btn-reconstruct" style="display: none;">🧩 Reconstruir Archivo</button>
         </div>
         
-        <div class="progress-container" id="progress-container" style="display: none;">
+        <!-- Barra de progreso para carga de archivos -->
+        <div class="progress-container" id="upload-progress-container" style="display: none;">
           <div class="progress-header">
-            <h3>Progreso de Reconstrucción</h3>
-            <span id="progress-percent">0%</span>
+            <h3>Procesando Imágenes</h3>
+            <span id="upload-progress-percent">0%</span>
           </div>
           <div class="progress-bar">
-            <div class="progress-fill" id="progress-fill"></div>
+            <div class="progress-fill" id="upload-progress-fill"></div>
           </div>
-          <div class="progress-details" id="progress-details">
+          <div class="progress-details" id="upload-progress-details">
+            <span>0/0 imágenes procesadas</span>
+          </div>
+        </div>
+        
+        <div class="progress-container" id="reconstruction-progress-container" style="display: none;">
+          <div class="progress-header">
+            <h3>Progreso de Reconstrucción</h3>
+            <span id="reconstruction-progress-percent">0%</span>
+          </div>
+          <div class="progress-bar">
+            <div class="progress-fill" id="reconstruction-progress-fill"></div>
+          </div>
+          <div class="progress-details" id="reconstruction-progress-details">
             <span>0/0 bloques escaneados</span>
           </div>
         </div>
@@ -65,6 +79,10 @@
             <label>Bloques totales:</label>
             <span id="info-blocks">-</span>
           </div>
+          <div class="info-item" id="encrypted-info" style="display: none;">
+            <label>Estado:</label>
+            <span id="info-encrypted">🔒 Cifrado</span>
+          </div>
         </div>
       </section>
       
@@ -90,7 +108,33 @@
     </div>
   </div>
 
+  <!-- Modal para contraseña -->
+  <div class="modal" id="password-modal">
+    <div class="modal-content">
+      <span class="close-btn" id="close-password-modal">✖</span>
+      <h3>Archivo Protegido</h3>
+      <p>Este archivo está cifrado. Por favor, introduce la contraseña para reconstruirlo.</p>
+      <input type="password" id="password-input" placeholder="Contraseña">
+      <div class="modal-buttons">
+        <button id="confirm-password" class="btn-primary">Aceptar</button>
+        <button id="cancel-password" class="btn-secondary">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal para detalles de archivo -->
+  <div class="modal" id="file-details-modal">
+    <div class="modal-content">
+      <span class="close-btn" id="close-details-modal">✖</span>
+      <h3>Detalles del Archivo</h3>
+      <div id="file-details-content"></div>
+    </div>
+  </div>
+
   <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/lz4@0.3.0/lz4.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/argon2-browser@1.18.0/lib/argon2.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/reed-solomon@6.0.0/reed-solomon.min.js"></script>
   <script src="script.js"></script>
 </body>
 </html>
