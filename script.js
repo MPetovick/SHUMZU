@@ -1,5 +1,3 @@
-<!-- script.js -->
-<script>
 // Configuración global
 const SHUMZU_VERSION = 'SHZv4';
 const QR_SIZE = 512;
@@ -335,4 +333,3 @@ window.addEventListener('load', async () => {
         showNotification('Error al cargar las dependencias necesarias', 'error');
     }
 });
-</script>
