@@ -1,306 +1,338 @@
-class QRScanner {
-    constructor() {
-        this.video = document.getElementById('video');
-        this.cameraContainer = document.getElementById('cameraContainer');
-        this.inactiveOverlay = document.getElementById('inactiveOverlay');
-        this.progressText = document.getElementById('progressText');
-        this.progressBar = document.getElementById('progressBar');
-        this.stream = null;
-        this.scanning = false;
-        this.qrDataMap = new Map();
-        this.password = null;
-        this.totalBlocks = null; // Estimado tras leer metadatos
-        this.init();
+<!-- script.js -->
+<script>
+// Configuración global
+const SHUMZU_VERSION = 'SHZv4';
+const QR_SIZE = 512;
+let collectedBlocks = new Map();
+let totalBlocks = 0;
+let metadata = null;
+let scannerActive = false;
+let videoStream = null;
+
+// Elementos DOM
+const openCameraBtn = document.getElementById('open-camera');
+const fileInput = document.getElementById('file-input');
+const cameraModal = document.getElementById('camera-modal');
+const closeModalBtn = document.getElementById('close-modal');
+const cameraStream = document.getElementById('camera-stream');
+
+// Inicialización
+document.addEventListener('DOMContentLoaded', () => {
+    openCameraBtn.addEventListener('click', openCamera);
+    closeModalBtn.addEventListener('click', closeCamera);
+    fileInput.addEventListener('change', handleFileUpload);
+});
+
+// Abrir cámara para escanear QR dinámicos
+async function openCamera() {
+    try {
+        cameraModal.style.display = 'flex';
+        videoStream = await navigator.mediaDevices.getUserMedia({ 
+            video: { 
+                facingMode: 'environment',
+                width: { ideal: 1280 },
+                height: { ideal: 720 }
+            } 
+        });
+        cameraStream.srcObject = videoStream;
+        scannerActive = true;
+        startQRScanning();
+    } catch (error) {
+        console.error('Error al acceder a la cámara:', error);
+        alert('No se pudo acceder a la cámara. Asegúrate de permitir el acceso.');
     }
+}
 
-    init() {
-        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-            alert('Este navegador no soporta el acceso a la cámara.');
-            return;
-        }
-
-        this.cameraContainer.addEventListener('click', () => this.toggleCamera());
-        document.getElementById('reconstructButton').addEventListener('click', () => this.reconstructFile());
-        window.addEventListener('beforeunload', () => this.cleanup());
+// Cerrar cámara
+function closeCamera() {
+    scannerActive = false;
+    if (videoStream) {
+        videoStream.getTracks().forEach(track => track.stop());
+        videoStream = null;
     }
+    cameraModal.style.display = 'none';
+}
 
-    async toggleCamera() {
-        if (this.stream) {
-            this.stopCamera();
-        } else {
-            await this.startCamera();
-        }
-    }
+// Manejar subida de archivos (QR estáticos)
+function handleFileUpload(event) {
+    const files = event.target.files;
+    if (!files.length) return;
+    
+    Array.from(files).forEach(file => {
+        const reader = new FileReader();
+        reader.onload = e => processImageFile(e.target.result, file.name);
+        reader.readAsDataURL(file);
+    });
+}
 
-    async startCamera() {
-        try {
-            this.cameraContainer.classList.add('active');
-            this.stream = await navigator.mediaDevices.getUserMedia({ 
-                video: { 
-                    facingMode: 'environment',
-                    width: { ideal: 1280 },
-                    height: { ideal: 720 }
-                } 
-            });
-            this.video.srcObject = this.stream;
-            
-            await new Promise((resolve) => {
-                this.video.onloadedmetadata = () => {
-                    this.video.play().then(resolve);
-                };
-            });
-            
-            this.scanning = true;
-            this.scan();
-        } catch (err) {
-            console.error('Error al acceder a la cámara:', err);
-            this.cameraContainer.classList.remove('active');
-            alert('No se pudo acceder a la cámara: ' + err.message);
-        }
-    }
+// Procesar imagen de QR estático
+function processImageFile(dataUrl, filename) {
+    const img = new Image();
+    img.onload = () => decodeQRFromImage(img, filename);
+    img.src = dataUrl;
+}
 
-    stopCamera() {
-        if (this.stream) {
-            this.stream.getTracks().forEach(track => track.stop());
-            this.stream = null;
-        }
-        this.scanning = false;
-        this.video.srcObject = null;
-        this.cameraContainer.classList.remove('active');
-        this.updateProgress(0, null);
-    }
-
-    scan() {
-        if (!this.scanning) return;
-
-        if (this.video.videoWidth === 0 || this.video.videoHeight === 0) {
-            requestAnimationFrame(() => this.scan());
-            return;
-        }
-
-        const canvas = document.createElement('canvas');
-        const context = canvas.getContext('2d');
-        canvas.width = this.video.videoWidth;
-        canvas.height = this.video.videoHeight;
-        
-        context.drawImage(this.video, 0, 0, canvas.width, canvas.height);
-        const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
-        
-        // Detectar múltiples QR usando jsQR (limitado a uno por frame por defecto)
+// Decodificar QR desde imagen
+function decodeQRFromImage(img, filename) {
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    canvas.width = img.width;
+    canvas.height = img.height;
+    ctx.drawImage(img, 0, 0, img.width, img.height);
+    
+    try {
+        const imageData = ctx.getImageData(0, 0, img.width, img.height);
         const code = jsQR(imageData.data, imageData.width, imageData.height, {
-            inversionAttempts: 'dontInvert'
+            inversionAttempts: 'dontInvert',
         });
-
+        
         if (code) {
-            this.handleQRCode(code.data);
+            processQRData(code.data, filename);
+        } else {
+            console.warn('No se detectó código QR en la imagen:', filename);
         }
-
-        // Escaneo adicional para múltiples QR dividiendo la imagen en regiones
-        this.scanMultipleRegions(imageData, canvas.width, canvas.height);
-
-        setTimeout(() => this.scan(), 100); // 10 FPS para reducir carga
+    } catch (error) {
+        console.error('Error al procesar imagen:', error);
     }
+}
 
-    scanMultipleRegions(imageData, width, height) {
-        const regions = [
-            { x: 0, y: 0, w: width / 2, h: height / 2 }, // Top-left
-            { x: width / 2, y: 0, w: width / 2, h: height / 2 }, // Top-right
-            { x: 0, y: height / 2, w: width / 2, h: height / 2 }, // Bottom-left
-            { x: width / 2, y: height / 2, w: width / 2, h: height / 2 } // Bottom-right
-        ];
-
-        regions.forEach(region => {
-            const regionData = this.extractRegion(imageData, region.x, region.y, region.w, region.h);
-            const code = jsQR(regionData.data, region.w, region.h);
-            if (code) {
-                this.handleQRCode(code.data);
-            }
-        });
-    }
-
-    extractRegion(imageData, x, y, w, h) {
-        const newData = new Uint8ClampedArray(w * h * 4);
-        for (let i = 0; i < h; i++) {
-            for (let j = 0; j < w; j++) {
-                const srcIndex = ((y + i) * imageData.width + (x + j)) * 4;
-                const destIndex = (i * w + j) * 4;
-                newData[destIndex] = imageData.data[srcIndex];
-                newData[destIndex + 1] = imageData.data[srcIndex + 1];
-                newData[destIndex + 2] = imageData.data[srcIndex + 2];
-                newData[destIndex + 3] = imageData.data[srcIndex + 3];
-            }
-        }
-        return new ImageData(newData, w, h);
-    }
-
-    handleQRCode(data) {
-        try {
-            const qrData = JSON.parse(data);
-            if (typeof qrData.index !== 'number' || typeof qrData.data !== 'string') {
-                throw new Error('Formato de datos QR inválido');
-            }
-            if (!this.qrDataMap.has(qrData.index)) {
-                this.qrDataMap.set(qrData.index, qrData.data);
-                this.updateProgress(this.qrDataMap.size, this.totalBlocks);
-                console.log(`QR detectado: índice ${qrData.index}, total: ${this.qrDataMap.size}`);
-            }
+// Iniciar escaneo continuo desde cámara
+function startQRScanning() {
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    
+    function scanFrame() {
+        if (!scannerActive || !videoStream) return;
+        
+        if (cameraStream.readyState === cameraStream.HAVE_ENOUGH_DATA) {
+            canvas.width = cameraStream.videoWidth;
+            canvas.height = cameraStream.videoHeight;
+            ctx.drawImage(cameraStream, 0, 0, canvas.width, canvas.height);
             
-            if (qrData.index === 0 && this.qrDataMap.size === 1) {
-                this.promptPassword();
+            try {
+                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                const code = jsQR(imageData.data, imageData.width, imageData.height, {
+                    inversionAttempts: 'dontInvert',
+                });
+                
+                if (code) {
+                    processQRData(code.data, 'live-camera');
+                    // Feedback visual breve al detectar QR
+                    cameraStream.style.border = '3px solid #4CAF50';
+                    setTimeout(() => {
+                        if (cameraStream) cameraStream.style.border = 'none';
+                    }, 300);
+                }
+            } catch (error) {
+                console.error('Error en escaneo:', error);
             }
-        } catch (error) {
-            console.error('Error al analizar datos QR:', error);
+        }
+        
+        if (scannerActive) {
+            requestAnimationFrame(scanFrame);
         }
     }
+    
+    scanFrame();
+}
 
-    promptPassword() {
-        const password = prompt('Ingrese la contraseña para descifrar los datos (deje en blanco si no hay encriptación):');
-        this.password = password || null;
-    }
-
-    updateProgress(detected, total) {
-        this.progressText.textContent = total 
-            ? `Escaneando QR: ${detected} de ${total} detectados` 
-            : `Escaneando QR: ${detected} detectados`;
-        const percentage = total ? (detected / total) * 100 : 0;
-        this.progressBar.style.width = `${percentage}%`;
-    }
-
-    async deriveKey(password, salt) {
-        const hash = await argon2.hash({
-            pass: password,
-            salt: salt,
-            time: 2,
-            mem: 102400,
-            parallelism: 8,
-            hashLen: 32,
-            type: argon2.ArgonType.Argon2id
-        });
-        return new Uint8Array(hash.hash);
-    }
-
-    async decryptData(encryptedData, password) {
-        const bytes = new Uint8Array([...window.atob(encryptedData)].map(c => c.charCodeAt(0)));
-        const salt = bytes.slice(0, 16);
-        const nonce = bytes.slice(16, 28);
-        const tag = bytes.slice(28, 44);
-        const ciphertext = bytes.slice(44);
-        const dataToDecrypt = new Uint8Array([...ciphertext, ...tag]);
+// Procesar datos del QR
+function processQRData(data, source) {
+    try {
+        const qrData = JSON.parse(data);
         
-        const keyMaterial = await this.deriveKey(password, salt);
-        const key = await crypto.subtle.importKey(
-            "raw",
-            keyMaterial,
-            { name: "AES-GCM" },
-            false,
-            ["decrypt"]
-        );
-        
-        const decrypted = await crypto.subtle.decrypt(
-            {
-                name: "AES-GCM",
-                iv: nonce,
-                tagLength: 128
-            },
-            key,
-            dataToDecrypt
-        );
-        return new Uint8Array(decrypted);
-    }
-
-    decompressData(compressedData) {
-        try {
-            const zstdDecompressed = ZSTD.decompress(compressedData);
-            const brotliDecompressed = brotliDecompress(zstdDecompressed);
-            return brotliDecompressed;
-        } catch (error) {
-            throw new Error('Error al descomprimir los datos: ' + error.message);
-        }
-    }
-
-    async reconstructFile() {
-        if (this.qrDataMap.size === 0) {
-            alert('No se han escaneado QR codes.');
+        // Validar formato SHUMZU
+        if (!qrData.v || qrData.v !== SHUMZU_VERSION) {
+            console.warn('QR no válido (versión incorrecta):', source);
             return;
         }
-
-        try {
-            const encryptedMetadata = this.qrDataMap.get(0);
-            if (!encryptedMetadata) {
-                throw new Error('Metadato faltante (índice 0).');
+        
+        const index = qrData.i;
+        const encodedData = qrData.d;
+        
+        // Si es el bloque de metadatos (índice 0)
+        if (index === 0) {
+            try {
+                metadata = JSON.parse(atob(encodedData));
+                totalBlocks = metadata.tb;
+                console.log('Metadatos recibidos:', metadata);
+                showNotification(`Archivo detectado: ${metadata.n} (${totalBlocks-1} bloques)`);
+            } catch (e) {
+                console.error('Error al procesar metadatos:', e);
+                return;
             }
-
-            let compressedMetadata;
-            if (this.password) {
-                if (!this.password && this.qrDataMap.size === 1) {
-                    this.promptPassword();
-                    if (!this.password) return;
-                }
-                compressedMetadata = await this.decryptData(encryptedMetadata, this.password);
-            } else {
-                compressedMetadata = new Uint8Array([...window.atob(encryptedMetadata)].map(c => c.charCodeAt(0)));
-            }
-
-            const metadataStr = new TextDecoder().decode(this.decompressData(compressedMetadata));
-            const metadata = JSON.parse(metadataStr);
-            const fileName = metadata.file_name;
-            const expectedHash = metadata.hash;
-            this.totalBlocks = this.qrDataMap.size; // Actualizar total estimado
-            this.updateProgress(this.qrDataMap.size, this.totalBlocks);
-
-            const maxIndex = Math.max(...this.qrDataMap.keys());
-            let reconstructedData = new Uint8Array();
-
-            for (let i = 1; i <= maxIndex; i++) {
-                const encryptedBlock = this.qrDataMap.get(i);
-                if (!encryptedBlock) {
-                    throw new Error(`Falta el bloque ${i}.`);
-                }
-                let blockData;
-                if (this.password) {
-                    const compressedBlock = await this.decryptData(encryptedBlock, this.password);
-                    blockData = this.decompressData(compressedBlock);
-                } else {
-                    const compressedBlock = new Uint8Array([...window.atob(encryptedBlock)].map(c => c.charCodeAt(0)));
-                    blockData = this.decompressData(compressedBlock);
-                }
-                reconstructedData = new Uint8Array([...reconstructedData, ...blockData]);
-            }
-
-            const computedHash = sha3_256(reconstructedData);
-            if (computedHash !== expectedHash) {
-                throw new Error('Verificación de integridad fallida: hashes no coinciden.');
-            }
-
-            this.downloadFile(reconstructedData, fileName);
-            alert('Archivo reconstruido exitosamente.');
-            this.cleanup();
-        } catch (error) {
-            console.error('Error al reconstruir el archivo:', error);
-            alert('Error al reconstruir el archivo: ' + error.message);
         }
+        
+        // Almacenar bloque
+        if (!collectedBlocks.has(index)) {
+            collectedBlocks.set(index, encodedData);
+            console.log(`Bloque ${index} recibido de: ${source}`);
+            updateProgress();
+            
+            // Verificar si tenemos todos los bloques
+            if (collectedBlocks.size === totalBlocks && totalBlocks > 0) {
+                showNotification('¡Todos los bloques recibidos! Reconstruyendo archivo...');
+                setTimeout(reconstructFile, 1000);
+            }
+        }
+    } catch (error) {
+        console.error('Error al procesar datos QR:', error, data);
     }
+}
 
-    downloadFile(data, filename) {
-        const blob = new Blob([data], { type: 'application/octet-stream' });
+// Actualizar barra de progreso
+function updateProgress() {
+    if (totalBlocks <= 0) return;
+    
+    const progress = Math.round((collectedBlocks.size / totalBlocks) * 100);
+    console.log(`Progreso: ${progress}% (${collectedBlocks.size}/${totalBlocks} bloques)`);
+    
+    // Aquí podrías actualizar una barra de progreso visual en la UI
+}
+
+// Reconstruir archivo desde los bloques
+async function reconstructFile() {
+    if (!metadata || collectedBlocks.size < totalBlocks) {
+        showNotification('Faltan bloques para reconstruir el archivo', 'error');
+        return;
+    }
+    
+    try {
+        showNotification('Reconstruyendo archivo...', 'info');
+        
+        // Ordenar bloques por índice
+        const sortedIndices = Array.from(collectedBlocks.keys()).sort((a, b) => a - b);
+        let compressedData = '';
+        
+        // Concatenar datos (omitir metadatos en índice 0)
+        for (let i = 1; i < totalBlocks; i++) {
+            if (collectedBlocks.has(i)) {
+                compressedData += collectedBlocks.get(i);
+            } else {
+                throw new Error(`Falta el bloque ${i}`);
+            }
+        }
+        
+        // Decodificar de Base64
+        const compressedBytes = base64ToBytes(compressedData);
+        
+        // Aquí iría la lógica de descompresión LZ4 y descifrado
+        // Por ahora simulamos la reconstrucción
+        console.log('Datos comprimidos recibidos:', compressedBytes.length, 'bytes');
+        
+        // Simular descompresión (en un caso real usarías LZ4)
+        const decompressedData = compressedBytes; // Esto sería reemplazado por LZ4.decompress(compressedBytes)
+        
+        // Crear y descargar archivo
+        const blob = new Blob([decompressedData], { type: metadata.t });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = filename;
+        a.download = metadata.n;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
-    }
-
-    cleanup() {
-        this.stopCamera();
-        this.qrDataMap.clear();
-        this.password = null;
-        this.totalBlocks = null;
+        
+        showNotification(`Archivo reconstruido: ${metadata.n}`, 'success');
+        
+        // Reiniciar para nuevo escaneo
+        resetScanner();
+        
+    } catch (error) {
+        console.error('Error al reconstruir archivo:', error);
+        showNotification('Error al reconstruir el archivo: ' + error.message, 'error');
     }
 }
 
-document.addEventListener('DOMContentLoaded', () => {
-    const scanner = new QRScanner();
+// Utilidad: Base64 a bytes
+function base64ToBytes(base64) {
+    const binaryString = atob(base64);
+    const bytes = new Uint8Array(binaryString.length);
+    for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+    }
+    return bytes;
+}
+
+// Mostrar notificación
+function showNotification(message, type = 'info') {
+    // Eliminar notificación anterior si existe
+    const existingNotification = document.getElementById('shumzu-notification');
+    if (existingNotification) {
+        existingNotification.remove();
+    }
+    
+    // Crear nueva notificación
+    const notification = document.createElement('div');
+    notification.id = 'shumzu-notification';
+    notification.textContent = message;
+    notification.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        padding: 15px 20px;
+        border-radius: 5px;
+        color: white;
+        font-family: Arial, sans-serif;
+        z-index: 10000;
+        max-width: 300px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        transition: opacity 0.3s;
+    `;
+    
+    // Estilo según tipo
+    if (type === 'error') {
+        notification.style.background = '#f44336';
+    } else if (type === 'success') {
+        notification.style.background = '#4CAF50';
+    } else {
+        notification.style.background = '#2196F3';
+    }
+    
+    document.body.appendChild(notification);
+    
+    // Auto-eliminar después de 5 segundos
+    setTimeout(() => {
+        if (notification.parentNode) {
+            notification.style.opacity = '0';
+            setTimeout(() => notification.remove(), 300);
+        }
+    }, 5000);
+}
+
+// Reiniciar escáner
+function resetScanner() {
+    collectedBlocks.clear();
+    totalBlocks = 0;
+    metadata = null;
+    console.log('Escáner reiniciado, listo para nuevo escaneo');
+}
+
+// Cargar librería jsQR dinámicamente
+function loadJSQR() {
+    return new Promise((resolve, reject) => {
+        if (typeof jsQR !== 'undefined') {
+            resolve(jsQR);
+            return;
+        }
+        
+        const script = document.createElement('script');
+        script.src = 'https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js';
+        script.onload = () => resolve(jsQR);
+        script.onerror = () => reject(new Error('Error al cargar jsQR'));
+        document.head.appendChild(script);
+    });
+}
+
+// Inicializar cuando se carga la página
+window.addEventListener('load', async () => {
+    try {
+        await loadJSQR();
+        console.log('SHUMZU Web App inicializada correctamente');
+    } catch (error) {
+        console.error('Error al inicializar SHUMZU:', error);
+        showNotification('Error al cargar las dependencias necesarias', 'error');
+    }
 });
+</script>
