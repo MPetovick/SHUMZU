@@ -379,6 +379,25 @@ header {
   color: var(--secondary-color);
 }
 
+/* Modal de contraseña */
+#password-input {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  font-size: 1rem;
+  margin-top: 15px;
+  background: var(--bg-color);
+  color: var(--text-color);
+}
+
+.modal-buttons {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  margin-top: 20px;
+}
+
 /* Notificaciones */
 .notification {
   position: fixed;
@@ -457,6 +476,10 @@ header {
   
   .download-btn {
     align-self: flex-end;
+  }
+  
+  .modal-buttons {
+    flex-direction: column;
   }
 }
 
