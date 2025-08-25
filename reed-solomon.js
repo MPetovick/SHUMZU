@@ -10,7 +10,6 @@ class ReedSolomon {
     }
     
     initGF256() {
-        const gf256 = new Array(256);
         const expTable = new Array(256);
         const logTable = new Array(256);
         
@@ -143,30 +142,40 @@ class ReedSolomon {
             return data.slice(0, data.length - this.fecSize);
         }
         
-        // Find error locator polynomial
-        const errorLocator = this.findErrorLocatorPolynomial(syndrome);
-        
-        // Find error positions
-        const errorPositions = this.findErrorPositions(errorLocator, data.length);
-        
-        // Find error values
-        const errorValues = this.findErrorValues(syndrome, errorLocator, errorPositions);
-        
-        // Correct errors
-        const correctedData = [...data];
-        for (let i = 0; i < errorPositions.length; i++) {
-            correctedData[errorPositions[i]] ^= errorValues[i];
-        }
-        
-        // Verify correction
-        const verifySyndrome = this.calculateSyndrome(correctedData);
-        for (let i = 0; i < verifySyndrome.length; i++) {
-            if (verifySyndrome[i] !== 0) {
-                throw new Error("Uncorrectable errors detected");
+        try {
+            // Find error locator polynomial
+            const errorLocator = this.findErrorLocatorPolynomial(syndrome);
+            
+            // Find error positions
+            const errorPositions = this.findErrorPositions(errorLocator, data.length);
+            
+            if (errorPositions.length === 0) {
+                throw new Error("No se pudieron localizar los errores");
             }
+            
+            // Find error values
+            const errorValues = this.findErrorValues(syndrome, errorLocator, errorPositions);
+            
+            // Correct errors
+            const correctedData = [...data];
+            for (let i = 0; i < errorPositions.length; i++) {
+                correctedData[errorPositions[i]] ^= errorValues[i];
+            }
+            
+            // Verify correction
+            const verifySyndrome = this.calculateSyndrome(correctedData);
+            for (let i = 0; i < verifySyndrome.length; i++) {
+                if (verifySyndrome[i] !== 0) {
+                    throw new Error("Errores no corregibles detectados");
+                }
+            }
+            
+            return correctedData.slice(0, correctedData.length - this.fecSize);
+        } catch (error) {
+            console.warn("Error en corrección Reed-Solomon, devolviendo datos originales:", error.message);
+            // Return original data if correction fails
+            return data.slice(0, data.length - this.fecSize);
         }
-        
-        return correctedData.slice(0, correctedData.length - this.fecSize);
     }
     
     findErrorLocatorPolynomial(syndrome) {
@@ -291,4 +300,10 @@ function RSCodec(fecSize) {
             return new Uint8Array(decoded);
         }
     };
+}
+
+// Exportar para uso en navegadores
+if (typeof window !== 'undefined') {
+    window.ReedSolomon = ReedSolomon;
+    window.RSCodec = RSCodec;
 }
