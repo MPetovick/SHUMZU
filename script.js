@@ -1,10 +1,21 @@
-// Configuración global
+// script.js - Versión completamente mejorada y compatible con SHZ
+// Configuración global compatible con SHUMZU+ Python
 const SHUMZU_VERSION = 'SHZv4';
 const SALT_SIZE = 16;
 const NONCE_SIZE = 12;
 const TAG_SIZE = 16;
 const QR_SIZE = 512;
 const MAX_HISTORY_ITEMS = 20;
+const RS_RECOVERY = 15; // 15% de símbolos de recuperación
+
+// Constantes para algoritmos
+const ARGON2_PARAMS = {
+    time: 2,
+    mem: 102400,
+    parallelism: navigator.hardwareConcurrency || 4,
+    hashLen: 32,
+    type: argon2.ArgonType.Argon2id
+};
 
 let collectedBlocks = new Map();
 let totalBlocks = 0;
@@ -16,6 +27,12 @@ let isFileEncrypted = false;
 let scanAnimationFrame = null;
 let processingWorker = null;
 let messageCounter = 0;
+let scanStatistics = {
+    totalScanned: 0,
+    uniqueScanned: 0,
+    duplicates: 0,
+    lastScanTime: 0
+};
 
 // Elementos DOM
 const openCameraBtn = document.getElementById('open-camera');
@@ -23,6 +40,11 @@ const fileInput = document.getElementById('file-input');
 const cameraModal = document.getElementById('camera-modal');
 const closeModalBtn = document.getElementById('close-modal');
 const cameraStream = document.getElementById('camera-stream');
+const scanOverlay = document.getElementById('scan-overlay');
+const scanSuccess = document.getElementById('scan-success');
+const totalScannedEl = document.getElementById('total-scanned');
+const uniqueScannedEl = document.getElementById('unique-scanned');
+const duplicatesEl = document.getElementById('duplicates');
 const reconstructionProgressContainer = document.getElementById('reconstruction-progress-container');
 const reconstructionProgressFill = document.getElementById('reconstruction-progress-fill');
 const reconstructionProgressPercent = document.getElementById('reconstruction-progress-percent');
@@ -37,6 +59,7 @@ const infoType = document.getElementById('info-type');
 const infoSize = document.getElementById('info-size');
 const infoHash = document.getElementById('info-hash');
 const infoBlocks = document.getElementById('info-blocks');
+const blockStatusContainer = document.getElementById('block-status');
 const encryptedInfo = document.getElementById('encrypted-info');
 const historyList = document.getElementById('history-list');
 const clearHistoryBtn = document.getElementById('clear-history');
@@ -100,6 +123,9 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Verificar disponibilidad de APIs necesarias
     checkRequiredAPIs();
+    
+    // Inicializar estadísticas de escaneo
+    updateScanStatistics();
 });
 
 // Verificar APIs necesarias
@@ -132,10 +158,25 @@ function setTheme(theme) {
     themeToggle.textContent = theme === 'light' ? '🌙' : '☀️';
 }
 
+// Actualizar estadísticas de escaneo
+function updateScanStatistics() {
+    totalScannedEl.textContent = scanStatistics.totalScanned;
+    uniqueScannedEl.textContent = scanStatistics.uniqueScanned;
+    duplicatesEl.textContent = scanStatistics.duplicates;
+}
+
 // Abrir cámara para escanear QR dinámicos
 async function openCamera() {
     try {
         cameraModal.style.display = 'flex';
+        scanStatistics = {
+            totalScanned: 0,
+            uniqueScanned: 0,
+            duplicates: 0,
+            lastScanTime: 0
+        };
+        updateScanStatistics();
+        
         videoStream = await navigator.mediaDevices.getUserMedia({ 
             video: { 
                 facingMode: 'environment',
@@ -166,6 +207,7 @@ function closeCamera() {
     }
     cameraModal.style.display = 'none';
     updateScanStatus('', 'info');
+    scanOverlay.classList.remove('active');
 }
 
 // Manejar subida de archivos (QR estáticos)
@@ -534,11 +576,18 @@ function startQRScanning() {
                 
                 if (code) {
                     processQRData(code.data, 'live-camera');
-                    // Feedback visual breve al detectar QR
-                    cameraStream.style.border = '3px solid #4CAF50';
+                    // Feedback visual al detectar QR
+                    scanOverlay.classList.add('active');
+                    scanSuccess.style.display = 'block';
                     setTimeout(() => {
-                        if (cameraStream) cameraStream.style.border = 'none';
-                    }, 300);
+                        scanOverlay.classList.remove('active');
+                        scanSuccess.style.display = 'none';
+                    }, 1000);
+                    
+                    // Actualizar estadísticas
+                    scanStatistics.totalScanned++;
+                    scanStatistics.lastScanTime = Date.now();
+                    updateScanStatistics();
                 }
             } catch (error) {
                 console.error('Error en escaneo:', error);
@@ -553,7 +602,7 @@ function startQRScanning() {
     scanAnimationFrame = requestAnimationFrame(scanFrame);
 }
 
-// Procesar datos del QR
+// Procesar datos del QR - COMPATIBLE CON SHZ
 function processQRData(data, source) {
     try {
         const qrData = JSON.parse(data);
@@ -599,6 +648,10 @@ function processQRData(data, source) {
             collectedBlocks.set(index, encodedData);
             console.log(`Bloque ${index} recibido de: ${source}`);
             
+            // Actualizar estadísticas
+            scanStatistics.uniqueScanned++;
+            updateScanStatistics();
+            
             // Actualizar estado de escaneo
             if (source === 'live-camera') {
                 updateScanStatus(`Bloque ${index}/${totalBlocks-1} escaneado`, 'success');
@@ -623,6 +676,10 @@ function processQRData(data, source) {
                 }, 1000);
             }
         } else {
+            // Bloque duplicado
+            scanStatistics.duplicates++;
+            updateScanStatistics();
+            
             if (source === 'live-camera') {
                 updateScanStatus(`Bloque ${index} ya fue escaneado`, 'info');
             }
@@ -640,6 +697,9 @@ function displayFileInfo(metadata) {
     infoSize.textContent = metadata.s ? formatFileSize(metadata.s) : 'Desconocido';
     infoHash.textContent = metadata.h || 'No disponible';
     infoBlocks.textContent = `${metadata.tb - 1} bloques`;
+    
+    // Actualizar visualización de estado de bloques
+    updateBlockStatusDisplay();
 }
 
 // Formatear tamaño de archivo
@@ -649,6 +709,42 @@ function formatFileSize(bytes) {
     const sizes = ['Bytes', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+}
+
+// Actualizar visualización de estado de bloques
+function updateBlockStatusDisplay() {
+    if (!totalBlocks) return;
+    
+    blockStatusContainer.innerHTML = '';
+    const blocksToShow = Math.min(totalBlocks, 100); // Límite para no sobrecargar la UI
+    
+    for (let i = 0; i < blocksToShow; i++) {
+        const blockIndicator = document.createElement('div');
+        blockIndicator.className = 'block-indicator';
+        
+        if (i === 0) {
+            // Bloque de metadatos
+            blockIndicator.classList.add('received');
+            blockIndicator.title = 'Metadatos';
+        } else if (collectedBlocks.has(i)) {
+            blockIndicator.classList.add('received');
+            blockIndicator.title = `Bloque ${i} recibido`;
+        } else {
+            blockIndicator.classList.add('missing');
+            blockIndicator.title = `Bloque ${i} faltante`;
+        }
+        
+        blockStatusContainer.appendChild(blockIndicator);
+    }
+    
+    if (totalBlocks > 100) {
+        const moreIndicator = document.createElement('div');
+        moreIndicator.textContent = `+${totalBlocks - 100} más...`;
+        moreIndicator.style.marginLeft = '10px';
+        moreIndicator.style.fontSize = '0.8rem';
+        moreIndicator.style.color = 'var(--secondary-color)';
+        blockStatusContainer.appendChild(moreIndicator);
+    }
 }
 
 // Actualizar barra de progreso de reconstrucción
@@ -674,6 +770,9 @@ function updateReconstructionProgress() {
     } else {
         reconstructionProgressFill.style.background = 'var(--success-color)';
     }
+    
+    // Actualizar visualización de bloques
+    updateBlockStatusDisplay();
 }
 
 // Manejar clic en el botón de reconstruir
@@ -722,7 +821,7 @@ function confirmPassword() {
     reconstructFile();
 }
 
-// Derivar clave con Argon2
+// Derivar clave con Argon2 - COMPATIBLE CON SHZ
 async function deriveKey(salt, password) {
     try {
         const key = await argon2.hash({
@@ -741,7 +840,7 @@ async function deriveKey(salt, password) {
     }
 }
 
-// Descifrar datos
+// Descifrar datos - COMPATIBLE CON SHZ
 async function decryptData(encryptedData, password) {
     try {
         const salt = encryptedData.slice(0, SALT_SIZE);
@@ -762,7 +861,7 @@ async function decryptData(encryptedData, password) {
     }
 }
 
-// Aplicar corrección de errores Reed-Solomon
+// Aplicar corrección de errores Reed-Solomon - COMPATIBLE CON SHZ
 function applyReedSolomon(data) {
     try {
         // Crear codec con el mismo nivel de corrección que Python
@@ -774,7 +873,7 @@ function applyReedSolomon(data) {
     }
 }
 
-// Descomprimir datos con pako (gzip)
+// Descomprimir datos con pako (gzip) - COMPATIBLE CON SHZ
 function decompressData(data) {
     try {
         return pako.inflate(data);
@@ -784,7 +883,7 @@ function decompressData(data) {
     }
 }
 
-// Calcular hash BLAKE2b
+// Calcular hash BLAKE2b - COMPATIBLE CON SHZ
 async function calculateBlake2bHash(data) {
     try {
         // Usar la librería blake2b
@@ -799,7 +898,7 @@ async function calculateBlake2bHash(data) {
     }
 }
 
-// Reconstruir archivo desde los bloques
+// Reconstruir archivo desde los bloques - COMPATIBLE CON SHZ
 async function reconstructFile() {
     if (!metadata) {
         showNotification('No hay metadatos. No se puede reconstruir el archivo.', 'error');
@@ -865,7 +964,7 @@ async function reconstructFile() {
     }
 }
 
-// Reconstruir en el hilo principal (fallback)
+// Reconstruir en el hilo principal (fallback) - COMPATIBLE CON SHZ
 async function reconstructInMainThread(data) {
     const { blocks, metadata, password, isEncrypted } = data;
     
@@ -1154,6 +1253,13 @@ function resetScanner() {
     encryptedInfo.style.display = 'none';
     reconstructBtn.style.display = 'none';
     reconstructBtn.disabled = false;
+    scanStatistics = {
+        totalScanned: 0,
+        uniqueScanned: 0,
+        duplicates: 0,
+        lastScanTime: 0
+    };
+    updateScanStatistics();
     console.log('Escáner reiniciado, listo para nuevo escaneo');
 }
 
