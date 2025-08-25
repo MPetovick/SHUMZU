@@ -3,9 +3,8 @@ const SHUMZU_VERSION = 'SHZv4';
 const SALT_SIZE = 16;
 const NONCE_SIZE = 12;
 const TAG_SIZE = 16;
-const RS_RECOVERY = 15; // 15% de símbolos de recuperación Reed-Solomon
-const QR_SIZE = 512; // Tamaño de cada código QR en píxeles
-const MAX_HISTORY_ITEMS = 20; // Límite de elementos en el historial
+const QR_SIZE = 512;
+const MAX_HISTORY_ITEMS = 20;
 
 let collectedBlocks = new Map();
 let totalBlocks = 0;
@@ -16,7 +15,7 @@ let filePassword = null;
 let isFileEncrypted = false;
 let scanAnimationFrame = null;
 let processingWorker = null;
-let messageCounter = 0; // Contador para IDs de mensajes
+let messageCounter = 0;
 
 // Elementos DOM
 const openCameraBtn = document.getElementById('open-camera');
@@ -202,7 +201,7 @@ function processImageFile(file, processed, totalFiles) {
         const img = new Image();
         img.onload = () => {
             // Verificar si es una matriz (múltiples QR en una imagen)
-            if (img.width > QR_SIZE || img.height > QR_SIZE) {
+            if (img.width > QR_SIZE * 1.5 || img.height > QR_SIZE * 1.5) {
                 processMatrixImage(img, file.name, processed, totalFiles);
             } else {
                 // Es un QR individual
@@ -246,8 +245,8 @@ function processImageFile(file, processed, totalFiles) {
 
 // Procesar imagen matricial (múltiples QR)
 function processMatrixImage(img, filename, processed, totalFiles) {
-    const cols = Math.floor(img.width / QR_SIZE);
-    const rows = Math.floor(img.height / QR_SIZE);
+    const cols = Math.ceil(img.width / QR_SIZE);
+    const rows = Math.ceil(img.height / QR_SIZE);
     const totalTiles = cols * rows;
     let decodedTiles = 0;
     
@@ -310,6 +309,71 @@ function processMatrixImage(img, filename, processed, totalFiles) {
 // Procesar archivo de video o GIF
 function processVideoFile(file, processed, totalFiles) {
     const url = URL.createObjectURL(file);
+    
+    if (file.type === 'image/gif') {
+        processGifFile(url, file.name, processed, totalFiles);
+    } else {
+        processVideoFrames(url, file.name, processed, totalFiles);
+    }
+}
+
+// Procesar archivo GIF
+function processGifFile(url, filename, processed, totalFiles) {
+    const img = new Image();
+    img.onload = function() {
+        // Crear canvas para extraer frames
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        
+        // Simular extracción de frames (simplificado)
+        const framesToProcess = 10; // Límite de frames a procesar
+        let framesProcessed = 0;
+        
+        for (let i = 0; i < framesToProcess; i++) {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(img, 0, 0);
+            
+            // Decodificar QR del frame
+            decodeQRFromImage(canvas.toDataURL(), `${filename}_frame_${i}`)
+                .then(result => {
+                    framesProcessed++;
+                    if (framesProcessed === framesToProcess) {
+                        processed++;
+                        updateUploadProgress(processed, totalFiles);
+                        URL.revokeObjectURL(url);
+                        
+                        if (processed === totalFiles) {
+                            showNotification(`${totalFiles} archivo(s) procesado(s)`, 'info');
+                            if (collectedBlocks.size > 0) {
+                                reconstructBtn.style.display = 'block';
+                            }
+                        }
+                    }
+                })
+                .catch(error => {
+                    console.error('Error procesando frame GIF:', error);
+                    framesProcessed++;
+                    if (framesProcessed === framesToProcess) {
+                        processed++;
+                        updateUploadProgress(processed, totalFiles);
+                        URL.revokeObjectURL(url);
+                    }
+                });
+        }
+    };
+    img.onerror = function() {
+        console.error('Error cargando GIF:', filename);
+        URL.revokeObjectURL(url);
+        processed++;
+        updateUploadProgress(processed, totalFiles);
+    };
+    img.src = url;
+}
+
+// Procesar video extrayendo frames
+function processVideoFrames(url, filename, processed, totalFiles) {
     const video = document.createElement('video');
     video.src = url;
     video.muted = true;
@@ -320,8 +384,8 @@ function processVideoFile(file, processed, totalFiles) {
     
     video.onloadedmetadata = () => {
         const duration = video.duration;
-        // Limitar a 100 frames máximo para no sobrecargar
-        const frameCount = Math.min(100, Math.floor(duration * 3));
+        // Limitar a 30 frames máximo para no sobrecargar
+        const frameCount = Math.min(30, Math.floor(duration * 3));
         
         if (frameCount === 0) {
             processed++;
@@ -364,7 +428,7 @@ function processVideoFile(file, processed, totalFiles) {
                         framesProcessed++;
                         
                         if (framesProcessed === frameCount) {
-                            showNotification(`${decodedFrames} frames decodificados de ${file.name}`, 'info');
+                            showNotification(`${decodedFrames} frames decodificados de ${filename}`, 'info');
                         }
                         
                         // Procesar siguiente frame
@@ -382,7 +446,7 @@ function processVideoFile(file, processed, totalFiles) {
     };
     
     video.onerror = () => {
-        console.error('Error cargando video:', file.name);
+        console.error('Error cargando video:', filename);
         URL.revokeObjectURL(url);
         processed++;
         updateUploadProgress(processed, totalFiles);
