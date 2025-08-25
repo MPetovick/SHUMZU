@@ -3,7 +3,6 @@ const SHUMZU_VERSION = 'SHZv4';
 const SALT_SIZE = 16;
 const NONCE_SIZE = 12;
 const TAG_SIZE = 16;
-const RS_RECOVERY = 15; // 15% de símbolos de recuperación Reed-Solomon
 
 let collectedBlocks = new Map();
 let totalBlocks = 0;
@@ -579,25 +578,15 @@ async function decryptData(encryptedData, password) {
     }
 }
 
-// Aplicar corrección de errores Reed-Solomon (implementación simplificada)
-function applyReedSolomon(data) {
-    try {
-        // Implementación básica de corrección de errores
-        // En una implementación real, se usaría una librería específica
-        return data;
-    } catch (error) {
-        console.error('Error en corrección Reed-Solomon:', error);
-        throw new Error('Error en corrección de errores');
-    }
-}
-
-// Descomprimir datos con pako (zlib)
+// Descomprimir datos con LZ4 (reemplaza pako)
 function decompressData(data) {
     try {
-        return pako.inflate(data);
+        // LZ4 espera un buffer, así que convertimos a ArrayBuffer si es necesario
+        const inputBuffer = data instanceof ArrayBuffer ? data : data.buffer;
+        return LZ4.decompress(inputBuffer);
     } catch (error) {
-        console.error('Error descomprimiendo datos:', error);
-        throw new Error('Error en descompresión');
+        console.error('Error descomprimiendo datos con LZ4:', error);
+        throw new Error('Error en descompresión LZ4');
     }
 }
 
@@ -645,12 +634,9 @@ async function reconstructFile() {
                     decryptedData = encryptedData;
                 }
                 
-                // Aplicar corrección Reed-Solomon
-                let correctedData = applyReedSolomon(decryptedData);
-                
                 // Colocar en la posición correcta
                 let start = (i-1) * metadata.b; // metadata.b es el tamaño de bloque
-                compressedData.set(new Uint8Array(correctedData), start);
+                compressedData.set(new Uint8Array(decryptedData), start);
             } else {
                 // Rellenar con zeros si falta el bloque
                 let start = (i-1) * metadata.b;
@@ -659,7 +645,7 @@ async function reconstructFile() {
             }
         }
         
-        // Descomprimir
+        // Descomprimir con LZ4
         let decompressedData = decompressData(compressedData);
         
         // Verificar hash
@@ -882,8 +868,8 @@ window.addEventListener('load', async () => {
             throw new Error('No se pudo cargar jsQR');
         }
         
-        if (typeof pako === 'undefined') {
-            throw new Error('No se pudo cargar pako (compresión)');
+        if (typeof LZ4 === 'undefined') {
+            throw new Error('No se pudo cargar LZ4 (compresión)');
         }
         
         if (typeof argon2 === 'undefined') {
