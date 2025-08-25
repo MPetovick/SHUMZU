@@ -1,61 +1,30 @@
-// Implementación completa de Reed-Solomon en JavaScript compatible con SHUMZU+
+// Implementación mejorada de Reed-Solomon en JavaScript compatible con SHUMZU+
 // Basado en la biblioteca reedsolomon de Python con capacidades completas de codificación/decodificación
 
 class ReedSolomon {
     constructor(fecSize) {
         this.fecSize = fecSize;
-        this.gf256 = this.initGF256();
+        this.initGF256();
         this.fecPolynomial = this.generatePolynomial(fecSize);
-        this.initGF256Tables();
     }
     
     initGF256() {
-        const expTable = new Array(256);
-        const logTable = new Array(256);
+        // Tablas de logaritmos y exponenciales para GF(256)
+        this.expTable = new Array(256);
+        this.logTable = new Array(256);
         
         let x = 1;
         for (let i = 0; i < 256; i++) {
-            expTable[i] = x;
-            logTable[x] = i;
+            this.expTable[i] = x;
+            this.logTable[x] = i;
             x <<= 1;
             if (x & 0x100) {
                 x ^= 0x11d; // Polynomial x^8 + x^4 + x^3 + x^2 + 1
             }
         }
         
-        expTable[255] = expTable[0];
-        logTable[0] = 0; // Should not be used
-        
-        this.expTable = expTable;
-        this.logTable = logTable;
-        
-        return expTable;
-    }
-    
-    initGF256Tables() {
-        // Create multiplication and division tables
-        this.mulTable = new Array(256);
-        this.divTable = new Array(256);
-        
-        for (let a = 0; a < 256; a++) {
-            this.mulTable[a] = new Array(256);
-            this.divTable[a] = new Array(256);
-            
-            for (let b = 0; b < 256; b++) {
-                if (a === 0 || b === 0) {
-                    this.mulTable[a][b] = 0;
-                    this.divTable[a][b] = 0;
-                } else {
-                    const logA = this.logTable[a];
-                    const logB = this.logTable[b];
-                    this.mulTable[a][b] = this.expTable[(logA + logB) % 255];
-                    
-                    if (a !== 0) {
-                        this.divTable[a][b] = this.expTable[(logB - logA + 255) % 255];
-                    }
-                }
-            }
-        }
+        this.expTable[255] = this.expTable[0];
+        this.logTable[0] = 0; // Should not be used
     }
     
     generatePolynomial(fecSize) {
