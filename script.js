@@ -5,6 +5,7 @@ const NONCE_SIZE = 12;
 const TAG_SIZE = 16;
 const RS_RECOVERY = 15; // 15% de símbolos de recuperación Reed-Solomon
 const QR_SIZE = 512; // Tamaño de cada código QR en píxeles
+const MAX_HISTORY_ITEMS = 20; // Límite de elementos en el historial
 
 let collectedBlocks = new Map();
 let totalBlocks = 0;
@@ -15,6 +16,7 @@ let filePassword = null;
 let isFileEncrypted = false;
 let scanAnimationFrame = null;
 let processingWorker = null;
+let messageCounter = 0; // Contador para IDs de mensajes
 
 // Elementos DOM
 const openCameraBtn = document.getElementById('open-camera');
@@ -78,6 +80,11 @@ document.addEventListener('DOMContentLoaded', () => {
             closePasswordModal();
             closeDetailsModal();
         }
+        
+        // Enter en modal de contraseña
+        if (e.key === 'Enter' && passwordModal.style.display === 'flex') {
+            confirmPassword();
+        }
     });
     
     // Inicializar Web Worker
@@ -88,6 +95,8 @@ document.addEventListener('DOMContentLoaded', () => {
             console.error('Error en Worker:', error);
             showNotification('Error en procesamiento de datos', 'error');
         };
+    } else {
+        showNotification('Web Workers no soportados. Algunas funciones estarán limitadas.', 'warning', 5000);
     }
     
     // Verificar disponibilidad de APIs necesarias
@@ -220,7 +229,17 @@ function processImageFile(file, processed, totalFiles) {
                     });
             }
         };
+        img.onerror = () => {
+            console.error('Error cargando imagen:', file.name);
+            processed++;
+            updateUploadProgress(processed, totalFiles);
+        };
         img.src = e.target.result;
+    };
+    reader.onerror = () => {
+        console.error('Error leyendo archivo:', file.name);
+        processed++;
+        updateUploadProgress(processed, totalFiles);
     };
     reader.readAsDataURL(file);
 }
@@ -294,14 +313,22 @@ function processVideoFile(file, processed, totalFiles) {
     const video = document.createElement('video');
     video.src = url;
     video.muted = true;
+    video.playsInline = true;
+    
+    let framesProcessed = 0;
+    let decodedFrames = 0;
     
     video.onloadedmetadata = () => {
         const duration = video.duration;
         // Limitar a 100 frames máximo para no sobrecargar
         const frameCount = Math.min(100, Math.floor(duration * 3));
         
-        let framesProcessed = 0;
-        let decodedFrames = 0;
+        if (frameCount === 0) {
+            processed++;
+            updateUploadProgress(processed, totalFiles);
+            URL.revokeObjectURL(url);
+            return;
+        }
         
         // Extraer frames a intervalos regulares
         const processNextFrame = (index) => {
@@ -352,6 +379,13 @@ function processVideoFile(file, processed, totalFiles) {
         };
         
         processNextFrame(0);
+    };
+    
+    video.onerror = () => {
+        console.error('Error cargando video:', file.name);
+        URL.revokeObjectURL(url);
+        processed++;
+        updateUploadProgress(processed, totalFiles);
     };
     
     video.load();
@@ -717,6 +751,7 @@ async function reconstructFile() {
     
     try {
         showNotification('Reconstruyendo archivo...', 'info');
+        reconstructBtn.disabled = true;
         
         // Preparar datos para el Worker
         const reconstructionData = {
@@ -728,7 +763,31 @@ async function reconstructFile() {
         
         // Enviar al Worker para procesamiento
         if (processingWorker) {
-            processingWorker.postMessage(reconstructionData);
+            const messageId = messageCounter++;
+            processingWorker.postMessage({
+                type: 'init',
+                data: {
+                    metadata: metadata,
+                    password: filePassword,
+                    isEncrypted: isFileEncrypted
+                },
+                id: messageId
+            });
+            
+            // Enviar bloques uno por uno
+            for (const [index, encodedData] of collectedBlocks.entries()) {
+                processingWorker.postMessage({
+                    type: 'process-block',
+                    data: { index, encodedData },
+                    id: messageId
+                });
+            }
+            
+            // Finalizar
+            processingWorker.postMessage({
+                type: 'finalize',
+                id: messageId
+            });
         } else {
             // Fallback si no hay Worker
             const result = await reconstructInMainThread(reconstructionData);
@@ -738,6 +797,7 @@ async function reconstructFile() {
     } catch (error) {
         console.error('Error al reconstruir archivo:', error);
         showNotification('Error al reconstruir el archivo: ' + error.message, 'error');
+        reconstructBtn.disabled = false;
     }
 }
 
@@ -771,7 +831,8 @@ async function reconstructInMainThread(data) {
             
             // Colocar en la posición correcta
             let start = (i-1) * metadata.b; // metadata.b es el tamaño de bloque
-            compressedData.set(new Uint8Array(correctedData), start);
+            let end = Math.min(start + correctedData.length, compressedData.length);
+            compressedData.set(new Uint8Array(correctedData).subarray(0, end - start), start);
         } else {
             // Rellenar con zeros si falta el bloque
             let start = (i-1) * metadata.b;
@@ -797,7 +858,7 @@ async function reconstructInMainThread(data) {
 
 // Manejar mensajes del Worker
 function handleWorkerMessage(event) {
-    const { type, data } = event.data;
+    const { type, data, id } = event.data;
     
     if (type === 'progress') {
         // Actualizar progreso
@@ -805,20 +866,25 @@ function handleWorkerMessage(event) {
     } else if (type === 'result') {
         // Procesar resultado
         handleReconstructionResult(data);
+        reconstructBtn.disabled = false;
     } else if (type === 'error') {
         // Manejar error
         console.error('Error en Worker:', data);
         showNotification('Error al reconstruir el archivo: ' + data, 'error');
+        reconstructBtn.disabled = false;
+    } else if (type === 'ack') {
+        // Confirmación de procesamiento
+        console.log('Mensaje procesado por worker:', id);
     }
 }
 
 // Manejar resultado de la reconstrucción
 function handleReconstructionResult(result) {
-    const { decompressedData, metadata, hashMatches, fileHash } = result;
+    const { decompressedData, metadata, hashMatches, fileHash, recoveredBlocks, totalBlocks } = result;
     
     // Verificar hash
     if (!hashMatches) {
-        showNotification('Advertencia: El hash del archivo no coincide con el original', 'warning');
+        showNotification('Advertencia: El hash del archivo no coincide con el original. El archivo puede estar corrupto.', 'warning', 7000);
     }
     
     // Crear y descargar archivo
@@ -833,7 +899,7 @@ function handleReconstructionResult(result) {
     URL.revokeObjectURL(url);
     
     // Guardar en historial
-    saveToHistory(metadata.n, metadata.t, decompressedData.length, fileHash, metadata.tb - 1);
+    saveToHistory(metadata.n, metadata.t, decompressedData.length, fileHash, totalBlocks, recoveredBlocks);
     
     showNotification(`Archivo reconstruido: ${metadata.n}`, 'success');
     
@@ -852,7 +918,7 @@ function base64ToBytes(base64) {
 }
 
 // Guardar en historial
-function saveToHistory(name, type, size, hash, blocks) {
+function saveToHistory(name, type, size, hash, totalBlocks, recoveredBlocks) {
     const history = getHistory();
     const newItem = {
         id: Date.now(),
@@ -860,14 +926,15 @@ function saveToHistory(name, type, size, hash, blocks) {
         type,
         size,
         hash,
-        blocks,
+        totalBlocks,
+        recoveredBlocks,
         date: new Date().toISOString()
     };
     
     history.unshift(newItem);
-    // Mantener solo los últimos 10 elementos
-    if (history.length > 10) {
-        history.pop();
+    // Mantener solo los últimos elementos
+    if (history.length > MAX_HISTORY_ITEMS) {
+        history.splice(MAX_HISTORY_ITEMS);
     }
     
     localStorage.setItem('shumzuHistory', JSON.stringify(history));
@@ -898,7 +965,7 @@ function loadHistory() {
             <div class="history-info">
                 <div class="history-name">${item.name}</div>
                 <div class="history-details">
-                    ${formatFileSize(item.size)} • ${new Date(item.date).toLocaleDateString()} • ${item.blocks} bloques
+                    ${formatFileSize(item.size)} • ${new Date(item.date).toLocaleDateString()} • ${item.recoveredBlocks || item.blocks}/${item.totalBlocks || item.blocks} bloques
                 </div>
             </div>
             <button class="download-btn" data-id="${item.id}">Ver detalles</button>
@@ -939,16 +1006,19 @@ function showHistoryItemDetails(id) {
             </div>
             <div class="info-item">
                 <label>Hash (BLAKE2b):</label>
-                <span>${item.hash}</span>
+                <span class="hash-value">${item.hash}</span>
             </div>
             <div class="info-item">
-                <label>Bloques:</label>
-                <span>${item.blocks}</span>
+                <label>Bloques recuperados:</label>
+                <span>${item.recoveredBlocks || item.blocks}/${item.totalBlocks || item.blocks}</span>
             </div>
             <div class="info-item">
                 <label>Fecha:</label>
                 <span>${new Date(item.date).toLocaleString()}</span>
             </div>
+        </div>
+        <div class="modal-actions">
+            <button class="btn-primary" onclick="navigator.clipboard.writeText('${item.hash}').then(() => showNotification('Hash copiado al portapapeles', 'success'))">Copiar hash</button>
         </div>
     `;
     
@@ -1019,6 +1089,7 @@ function resetScanner() {
     fileInfoSection.style.display = 'none';
     encryptedInfo.style.display = 'none';
     reconstructBtn.style.display = 'none';
+    reconstructBtn.disabled = false;
     console.log('Escáner reiniciado, listo para nuevo escaneo');
 }
 
@@ -1036,6 +1107,10 @@ window.addEventListener('load', async () => {
         
         if (typeof argon2 === 'undefined') {
             throw new Error('No se pudo cargar Argon2');
+        }
+        
+        if (typeof ReedSolomon === 'undefined') {
+            throw new Error('No se pudo cargar ReedSolomon');
         }
         
         console.log('SHUMZU Web App inicializada correctamente');
