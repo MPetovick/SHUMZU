@@ -3,6 +3,8 @@ const SHUMZU_VERSION = 'SHZv4';
 const SALT_SIZE = 16;
 const NONCE_SIZE = 12;
 const TAG_SIZE = 16;
+const RS_RECOVERY = 15; // 15% de símbolos de recuperación Reed-Solomon
+const QR_SIZE = 512; // Tamaño de cada código QR en píxeles
 
 let collectedBlocks = new Map();
 let totalBlocks = 0;
@@ -12,6 +14,7 @@ let videoStream = null;
 let filePassword = null;
 let isFileEncrypted = false;
 let scanAnimationFrame = null;
+let processingWorker = null;
 
 // Elementos DOM
 const openCameraBtn = document.getElementById('open-camera');
@@ -77,6 +80,16 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
     
+    // Inicializar Web Worker
+    if (window.Worker) {
+        processingWorker = new Worker('worker.js');
+        processingWorker.onmessage = handleWorkerMessage;
+        processingWorker.onerror = (error) => {
+            console.error('Error en Worker:', error);
+            showNotification('Error en procesamiento de datos', 'error');
+        };
+    }
+    
     // Verificar disponibilidad de APIs necesarias
     checkRequiredAPIs();
 });
@@ -87,7 +100,8 @@ function checkRequiredAPIs() {
         { name: 'MediaDevices', available: !!navigator.mediaDevices },
         { name: 'Blob', available: !!window.Blob },
         { name: 'FileReader', available: !!window.FileReader },
-        { name: 'crypto.subtle', available: !!window.crypto && !!window.crypto.subtle }
+        { name: 'crypto.subtle', available: !!window.crypto && !!window.crypto.subtle },
+        { name: 'Web Workers', available: !!window.Worker }
     ];
     
     const missingAPIs = requiredAPIs.filter(api => !api.available);
@@ -176,29 +190,102 @@ function handleFileUpload(event) {
 function processImageFile(file, processed, totalFiles) {
     const reader = new FileReader();
     reader.onload = e => {
-        decodeQRFromImage(e.target.result, file.name)
-            .then(result => {
-                if (result) {
-                    showNotification(`QR decodificado de ${file.name}`, 'success');
-                }
-                processed++;
-                updateUploadProgress(processed, totalFiles);
-                
-                if (processed === totalFiles) {
-                    showNotification(`${totalFiles} archivo(s) procesado(s)`, 'info');
-                    if (collectedBlocks.size > 0) {
-                        reconstructBtn.style.display = 'block';
-                    }
-                }
-            })
-            .catch(error => {
-                console.error('Error procesando imagen:', error);
-                showNotification(`Error al procesar ${file.name}`, 'error');
-                processed++;
-                updateUploadProgress(processed, totalFiles);
-            });
+        const img = new Image();
+        img.onload = () => {
+            // Verificar si es una matriz (múltiples QR en una imagen)
+            if (img.width > QR_SIZE || img.height > QR_SIZE) {
+                processMatrixImage(img, file.name, processed, totalFiles);
+            } else {
+                // Es un QR individual
+                decodeQRFromImage(e.target.result, file.name)
+                    .then(result => {
+                        if (result) {
+                            showNotification(`QR decodificado de ${file.name}`, 'success');
+                        }
+                        processed++;
+                        updateUploadProgress(processed, totalFiles);
+                        
+                        if (processed === totalFiles) {
+                            showNotification(`${totalFiles} archivo(s) procesado(s)`, 'info');
+                            if (collectedBlocks.size > 0) {
+                                reconstructBtn.style.display = 'block';
+                            }
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error procesando imagen:', error);
+                        showNotification(`Error al procesar ${file.name}`, 'error');
+                        processed++;
+                        updateUploadProgress(processed, totalFiles);
+                    });
+            }
+        };
+        img.src = e.target.result;
     };
     reader.readAsDataURL(file);
+}
+
+// Procesar imagen matricial (múltiples QR)
+function processMatrixImage(img, filename, processed, totalFiles) {
+    const cols = Math.floor(img.width / QR_SIZE);
+    const rows = Math.floor(img.height / QR_SIZE);
+    const totalTiles = cols * rows;
+    let decodedTiles = 0;
+    
+    if (totalTiles === 0) {
+        processed++;
+        updateUploadProgress(processed, totalFiles);
+        return;
+    }
+    
+    const canvas = document.createElement('canvas');
+    canvas.width = QR_SIZE;
+    canvas.height = QR_SIZE;
+    const ctx = canvas.getContext('2d');
+    
+    for (let row = 0; row < rows; row++) {
+        for (let col = 0; col < cols; col++) {
+            // Dibujar el tile en el canvas
+            ctx.clearRect(0, 0, QR_SIZE, QR_SIZE);
+            ctx.drawImage(
+                img, 
+                col * QR_SIZE, 
+                row * QR_SIZE, 
+                QR_SIZE, 
+                QR_SIZE,
+                0, 
+                0, 
+                QR_SIZE, 
+                QR_SIZE
+            );
+            
+            // Convertir a data URL y decodificar
+            const dataUrl = canvas.toDataURL('image/png');
+            decodeQRFromImage(dataUrl, `${filename}_tile_${row}_${col}`)
+                .then(result => {
+                    decodedTiles++;
+                    if (decodedTiles === totalTiles) {
+                        processed++;
+                        updateUploadProgress(processed, totalFiles);
+                        
+                        if (processed === totalFiles) {
+                            showNotification(`${totalFiles} archivo(s) procesado(s)`, 'info');
+                            if (collectedBlocks.size > 0) {
+                                reconstructBtn.style.display = 'block';
+                            }
+                        }
+                    }
+                })
+                .catch(error => {
+                    console.error(`Error procesando tile ${row}-${col}:`, error);
+                    decodedTiles++;
+                    if (decodedTiles === totalTiles) {
+                        processed++;
+                        updateUploadProgress(processed, totalFiles);
+                    }
+                });
+        }
+    }
 }
 
 // Procesar archivo de video o GIF
@@ -210,7 +297,8 @@ function processVideoFile(file, processed, totalFiles) {
     
     video.onloadedmetadata = () => {
         const duration = video.duration;
-        const frameCount = Math.min(100, Math.floor(duration * 3)); // Máximo 100 frames a 3 FPS
+        // Limitar a 100 frames máximo para no sobrecargar
+        const frameCount = Math.min(100, Math.floor(duration * 3));
         
         let framesProcessed = 0;
         let decodedFrames = 0;
@@ -291,7 +379,6 @@ function decodeQRFromImage(dataUrl, filename) {
                     resolve(true);
                 } else {
                     console.warn('No se detectó código QR en la imagen:', filename);
-                    showNotification(`No se detectó QR en ${filename}`, 'warning');
                     resolve(false);
                 }
             } catch (error) {
@@ -376,7 +463,6 @@ function processQRData(data, source) {
         // Validar formato SHUMZU
         if (!qrData.v || qrData.v !== SHUMZU_VERSION) {
             console.warn('QR no válido (versión incorrecta):', source);
-            showNotification('Código QR no compatible con SHUMZU', 'warning');
             return;
         }
         
@@ -386,9 +472,10 @@ function processQRData(data, source) {
         // Si es el bloque de metadatos (índice 0)
         if (index === 0) {
             try {
-                metadata = JSON.parse(atob(encodedData));
+                // Decodificar metadatos
+                const decodedMetadata = atob(encodedData);
+                metadata = JSON.parse(decodedMetadata);
                 totalBlocks = metadata.tb;
-                console.log('Metadatos recibidos:', metadata);
                 
                 // Mostrar información del archivo
                 displayFileInfo(metadata);
@@ -399,7 +486,7 @@ function processQRData(data, source) {
                 updateReconstructionProgress();
                 
                 // Verificar si el archivo está cifrado
-                if (metadata.encrypted) {
+                if (metadata.e) { // Campo 'e' indica si está cifrado
                     isFileEncrypted = true;
                     encryptedInfo.style.display = 'flex';
                 }
@@ -444,7 +531,6 @@ function processQRData(data, source) {
         }
     } catch (error) {
         console.error('Error al procesar datos QR:', error, data);
-        showNotification('Error al procesar código QR', 'error');
     }
 }
 
@@ -578,23 +664,41 @@ async function decryptData(encryptedData, password) {
     }
 }
 
-// Descomprimir datos con LZ4 (reemplaza pako)
-function decompressData(data) {
+// Aplicar corrección de errores Reed-Solomon
+function applyReedSolomon(data) {
     try {
-        // LZ4 espera un buffer, así que convertimos a ArrayBuffer si es necesario
-        const inputBuffer = data instanceof ArrayBuffer ? data : data.buffer;
-        return LZ4.decompress(inputBuffer);
+        // Crear codec con el mismo nivel de corrección que Python
+        const rs = new ReedSolomon(RS_RECOVERY);
+        return rs.decode(data);
     } catch (error) {
-        console.error('Error descomprimiendo datos con LZ4:', error);
-        throw new Error('Error en descompresión LZ4');
+        console.error('Error en corrección Reed-Solomon:', error);
+        throw new Error('Error en corrección de errores');
     }
 }
 
-// Calcular hash SHA-256
-async function calculateSHA256Hash(data) {
-    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-    const hashArray = Array.from(new Uint8Array(hashBuffer));
-    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+// Descomprimir datos con pako (gzip)
+function decompressData(data) {
+    try {
+        return pako.inflate(data);
+    } catch (error) {
+        console.error('Error descomprimiendo datos:', error);
+        throw new Error('Error en descompresión');
+    }
+}
+
+// Calcular hash BLAKE2b
+async function calculateBlake2bHash(data) {
+    try {
+        // Usar la librería blake2b
+        const hash = blake2b(32); // 32 bytes = 256 bits
+        hash.update(new Uint8Array(data));
+        return Array.from(new Uint8Array(hash.digest()))
+            .map(b => b.toString(16).padStart(2, '0'))
+            .join('');
+    } catch (error) {
+        console.error('Error calculando hash:', error);
+        throw new Error('Error en cálculo de hash');
+    }
 }
 
 // Reconstruir archivo desde los bloques
@@ -614,69 +718,127 @@ async function reconstructFile() {
     try {
         showNotification('Reconstruyendo archivo...', 'info');
         
-        // Ordenar bloques por índice
-        const sortedIndices = Array.from(collectedBlocks.keys()).sort((a, b) => a - b);
-        let compressedData = new Uint8Array(metadata.c); // metadata.c es el tamaño comprimido
+        // Preparar datos para el Worker
+        const reconstructionData = {
+            blocks: Array.from(collectedBlocks.entries()),
+            metadata: metadata,
+            password: filePassword,
+            isEncrypted: isFileEncrypted
+        };
         
-        // Procesar cada bloque (excepto el 0 que son metadatos)
-        for (let i = 1; i < totalBlocks; i++) {
-            if (collectedBlocks.has(i)) {
-                let blockData = collectedBlocks.get(i);
-                
-                // Decodificar base64
-                let encryptedData = base64ToBytes(blockData);
-                
-                // Descifrar si hay contraseña
-                let decryptedData;
-                if (isFileEncrypted) {
-                    decryptedData = await decryptData(encryptedData, filePassword);
-                } else {
-                    decryptedData = encryptedData;
-                }
-                
-                // Colocar en la posición correcta
-                let start = (i-1) * metadata.b; // metadata.b es el tamaño de bloque
-                compressedData.set(new Uint8Array(decryptedData), start);
-            } else {
-                // Rellenar con zeros si falta el bloque
-                let start = (i-1) * metadata.b;
-                let end = Math.min(start + metadata.b, metadata.c);
-                compressedData.fill(0, start, end);
-            }
+        // Enviar al Worker para procesamiento
+        if (processingWorker) {
+            processingWorker.postMessage(reconstructionData);
+        } else {
+            // Fallback si no hay Worker
+            const result = await reconstructInMainThread(reconstructionData);
+            handleReconstructionResult(result);
         }
-        
-        // Descomprimir con LZ4
-        let decompressedData = decompressData(compressedData);
-        
-        // Verificar hash
-        let fileHash = await calculateSHA256Hash(decompressedData);
-        if (fileHash !== metadata.h) {
-            showNotification('Advertencia: El hash del archivo no coincide con el original', 'warning');
-        }
-        
-        // Crear y descargar archivo
-        const blob = new Blob([decompressedData], { type: metadata.t });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = metadata.n;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-        
-        // Guardar en historial
-        saveToHistory(metadata.n, metadata.t, blob.size, fileHash, totalBlocks - 1);
-        
-        showNotification(`Archivo reconstruido: ${metadata.n}`, 'success');
-        
-        // Reiniciar para nuevo escaneo
-        resetScanner();
         
     } catch (error) {
         console.error('Error al reconstruir archivo:', error);
         showNotification('Error al reconstruir el archivo: ' + error.message, 'error');
     }
+}
+
+// Reconstruir en el hilo principal (fallback)
+async function reconstructInMainThread(data) {
+    const { blocks, metadata, password, isEncrypted } = data;
+    
+    // Ordenar bloques por índice
+    const sortedBlocks = blocks.sort((a, b) => a[0] - b[0]);
+    let compressedData = new Uint8Array(metadata.c); // metadata.c es el tamaño comprimido
+    
+    // Procesar cada bloque (excepto el 0 que son metadatos)
+    for (let i = 1; i < metadata.tb; i++) {
+        const block = sortedBlocks.find(b => b[0] === i);
+        if (block) {
+            let blockData = block[1];
+            
+            // Decodificar base64
+            let encryptedData = base64ToBytes(blockData);
+            
+            // Descifrar si hay contraseña
+            let decryptedData;
+            if (isEncrypted && password) {
+                decryptedData = await decryptData(encryptedData, password);
+            } else {
+                decryptedData = encryptedData;
+            }
+            
+            // Aplicar corrección Reed-Solomon
+            let correctedData = applyReedSolomon(decryptedData);
+            
+            // Colocar en la posición correcta
+            let start = (i-1) * metadata.b; // metadata.b es el tamaño de bloque
+            compressedData.set(new Uint8Array(correctedData), start);
+        } else {
+            // Rellenar con zeros si falta el bloque
+            let start = (i-1) * metadata.b;
+            let end = Math.min(start + metadata.b, metadata.c);
+            compressedData.fill(0, start, end);
+        }
+    }
+    
+    // Descomprimir
+    let decompressedData = decompressData(compressedData);
+    
+    // Verificar hash
+    let fileHash = await calculateBlake2bHash(decompressedData);
+    const hashMatches = fileHash === metadata.h;
+    
+    return {
+        decompressedData: decompressedData,
+        metadata: metadata,
+        hashMatches: hashMatches,
+        fileHash: fileHash
+    };
+}
+
+// Manejar mensajes del Worker
+function handleWorkerMessage(event) {
+    const { type, data } = event.data;
+    
+    if (type === 'progress') {
+        // Actualizar progreso
+        updateReconstructionProgress(data);
+    } else if (type === 'result') {
+        // Procesar resultado
+        handleReconstructionResult(data);
+    } else if (type === 'error') {
+        // Manejar error
+        console.error('Error en Worker:', data);
+        showNotification('Error al reconstruir el archivo: ' + data, 'error');
+    }
+}
+
+// Manejar resultado de la reconstrucción
+function handleReconstructionResult(result) {
+    const { decompressedData, metadata, hashMatches, fileHash } = result;
+    
+    // Verificar hash
+    if (!hashMatches) {
+        showNotification('Advertencia: El hash del archivo no coincide con el original', 'warning');
+    }
+    
+    // Crear y descargar archivo
+    const blob = new Blob([decompressedData], { type: metadata.t });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = metadata.n;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    
+    // Guardar en historial
+    saveToHistory(metadata.n, metadata.t, decompressedData.length, fileHash, metadata.tb - 1);
+    
+    showNotification(`Archivo reconstruido: ${metadata.n}`, 'success');
+    
+    // Reiniciar para nuevo escaneo
+    resetScanner();
 }
 
 // Utilidad: Base64 a bytes
@@ -776,7 +938,7 @@ function showHistoryItemDetails(id) {
                 <span>${formatFileSize(item.size)}</span>
             </div>
             <div class="info-item">
-                <label>Hash (SHA-256):</label>
+                <label>Hash (BLAKE2b):</label>
                 <span>${item.hash}</span>
             </div>
             <div class="info-item">
@@ -868,8 +1030,8 @@ window.addEventListener('load', async () => {
             throw new Error('No se pudo cargar jsQR');
         }
         
-        if (typeof LZ4 === 'undefined') {
-            throw new Error('No se pudo cargar LZ4 (compresión)');
+        if (typeof pako === 'undefined') {
+            throw new Error('No se pudo cargar pako (compresión)');
         }
         
         if (typeof argon2 === 'undefined') {
