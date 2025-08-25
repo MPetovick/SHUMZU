@@ -1,143 +1,157 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>SHUMZU - Transferencia de Archivos via QR</title>
-  <link rel="stylesheet" href="styles.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SHUMZU - Almacenamiento Seguro con QR</title>
+    <meta name="description" content="SHUMZU combina compresión, cifrado y códigos QR para ofrecer una solución segura y eficiente para el almacenamiento y transmisión de datos.">
+    
+    <!-- Hojas de estilo -->
+    <link rel="stylesheet" href="styles.css">
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="./rsc/logo_SHUMZU.png">
+    
+    <!-- Scripts de terceros -->
+    <script src="https://cdn.jsdelivr.net/npm/jsQR@1.4.0/dist/jsQR.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/pako@2.1.0/dist/pako.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/argon2-browser@1.18.0/lib/argon2.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/blake2b@1.2.0/blake2b.min.js"></script>
+    
+    <!-- Scripts propios (se cargan al final del body) -->
 </head>
 <body>
-  <div class="container">
-    <header>
-      <div class="logo-container">
-        <div class="logo-shape">
-          <div class="logo-inner">SZ</div>
-        </div>
-        <h1 class="logo-text">SHUMZU</h1>
-      </div>
-      <p class="tagline">Transferencia de archivos mediante códigos QR</p>
-      <button id="theme-toggle" class="theme-toggle">🌙</button>
-    </header>
-    
-    <main class="main-content">
-      <section class="scan-section">
-        <div class="buttons">
-          <button id="open-camera" class="btn-primary">📷 Abrir Cámara</button>
-          <label for="file-input" class="btn-secondary">📂 Subir Imágenes QR</label>
-          <input type="file" id="file-input" accept="image/*,video/*,.gif" multiple>
-          <button id="reconstruct-btn" class="btn-reconstruct" style="display: none;">🧩 Reconstruir Archivo</button>
-        </div>
-        
-        <!-- Barra de progreso para carga de archivos -->
-        <div class="progress-container" id="upload-progress-container" style="display: none;">
-          <div class="progress-header">
-            <h3>Procesando Imágenes</h3>
-            <span id="upload-progress-percent">0%</span>
-          </div>
-          <div class="progress-bar">
-            <div class="progress-fill" id="upload-progress-fill"></div>
-          </div>
-          <div class="progress-details" id="upload-progress-details">
-            <span>0/0 imágenes procesadas</span>
-          </div>
-        </div>
-        
-        <div class="progress-container" id="reconstruction-progress-container" style="display: none;">
-          <div class="progress-header">
-            <h3>Progreso de Reconstrucción</h3>
-            <span id="reconstruction-progress-percent">0%</span>
-          </div>
-          <div class="progress-bar">
-            <div class="progress-fill" id="reconstruction-progress-fill"></div>
-          </div>
-          <div class="progress-details" id="reconstruction-progress-details">
-            <span>0/0 bloques escaneados</span>
-          </div>
-        </div>
-      </section>
-      
-      <section class="file-info" id="file-info" style="display: none;">
-        <h3>Información del Archivo</h3>
-        <div class="info-grid">
-          <div class="info-item">
-            <label>Nombre:</label>
-            <span id="info-name">-</span>
-          </div>
-          <div class="info-item">
-            <label>Tipo:</label>
-            <span id="info-type">-</span>
-          </div>
-          <div class="info-item">
-            <label>Tamaño:</label>
-            <span id="info-size">-</span>
-          </div>
-          <div class="info-item">
-            <label>Hash (BLAKE2b):</label>
-            <span id="info-hash">-</span>
-          </div>
-          <div class="info-item">
-            <label>Bloques totales:</label>
-            <span id="info-blocks">-</span>
-          </div>
-          <div class="info-item" id="encrypted-info" style="display: none;">
-            <label>Estado:</label>
-            <span id="info-encrypted">🔒 Cifrado</span>
-          </div>
-        </div>
-      </section>
-      
-      <section class="history-section">
-        <div class="section-header">
-          <h3>Historial de Reconstrucción</h3>
-          <button id="clear-history" class="btn-clear">Limpiar Historial</button>
-        </div>
-        <div class="history-list" id="history-list">
-          <!-- El historial se cargará dinámicamente -->
-        </div>
-      </section>
-    </main>
-  </div>
+    <div class="container">
+        <header>
+            <div class="logo-container">
+                <div class="logo-shape">
+                    <div class="logo-inner">SZ</div>
+                </div>
+                <h1 class="logo-text">SHUMZU</h1>
+            </div>
+            <p class="tagline">Almacenamiento Seguro con Códigos QR</p>
+            <button id="theme-toggle" class="theme-toggle">🌙</button>
+        </header>
 
-  <div class="modal" id="camera-modal">
-    <div class="modal-content">
-      <span class="close-btn" id="close-modal">✖</span>
-      <h3>Escaneando códigos QR</h3>
-      <p class="scan-help">Apunta la cámara hacia los códigos QR. El escaneo es automático.</p>
-      <video id="camera-stream" autoplay playsinline></video>
-      <div class="scan-status" id="scan-status"></div>
+        <main class="main-content">
+            <section class="scan-section">
+                <h2>Escanear Códigos QR</h2>
+                <div class="buttons">
+                    <button id="open-camera" class="btn-primary">Abrir Cámara</button>
+                    <button class="btn-secondary" onclick="document.getElementById('file-input').click()">
+                        Subir Imágenes/Video
+                    </button>
+                    <input type="file" id="file-input" accept="image/*,video/*" multiple style="display: none;">
+                </div>
+                
+                <div id="upload-progress-container" class="progress-container" style="display: none;">
+                    <div class="progress-header">
+                        <h3>Procesando archivos</h3>
+                        <span id="upload-progress-percent" class="progress-percent">0%</span>
+                    </div>
+                    <div class="progress-bar">
+                        <div id="upload-progress-fill" class="progress-fill"></div>
+                    </div>
+                    <div id="upload-progress-details" class="progress-details">0/0 archivos procesados</div>
+                </div>
+                
+                <div id="reconstruction-progress-container" class="progress-container" style="display: none;">
+                    <div class="progress-header">
+                        <h3>Reconstruyendo archivo</h3>
+                        <span id="reconstruction-progress-percent" class="progress-percent">0%</span>
+                    </div>
+                    <div class="progress-bar">
+                        <div id="reconstruction-progress-fill" class="progress-fill"></div>
+                    </div>
+                    <div id="reconstruction-progress-details" class="progress-details">0/0 bloques escaneados</div>
+                </div>
+                
+                <div id="file-info" class="file-info" style="display: none;">
+                    <h3>Información del Archivo</h3>
+                    <div class="info-grid">
+                        <div class="info-item">
+                            <label>Nombre:</label>
+                            <span id="info-name">-</span>
+                        </div>
+                        <div class="info-item">
+                            <label>Tipo:</label>
+                            <span id="info-type">-</span>
+                        </div>
+                        <div class="info-item">
+                            <label>Tamaño:</label>
+                            <span id="info-size">-</span>
+                        </div>
+                        <div class="info-item">
+                            <label>Hash (BLAKE2b):</label>
+                            <span id="info-hash" class="hash-value">-</span>
+                        </div>
+                        <div class="info-item">
+                            <label>Bloques:</label>
+                            <span id="info-blocks">-</span>
+                        </div>
+                        <div id="encrypted-info" class="info-item" style="display: none;">
+                            <label>Estado:</label>
+                            <span style="color: var(--success-color);">🔒 Cifrado</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="buttons" style="margin-top: 20px;">
+                    <button id="reconstruct-btn" class="btn-reconstruct" style="display: none;">
+                        <span>Reconstruir Archivo</span>
+                    </button>
+                </div>
+            </section>
+
+            <section class="history-section">
+                <div class="section-header">
+                    <h2>Historial de Reconstrucción</h2>
+                    <button id="clear-history" class="btn-clear">Limpiar Historial</button>
+                </div>
+                <div id="history-list" class="history-list">
+                    <p class="no-history">No hay archivos reconstruidos recientemente</p>
+                </div>
+            </section>
+        </main>
     </div>
-  </div>
 
-  <!-- Modal para contraseña -->
-  <div class="modal" id="password-modal">
-    <div class="modal-content">
-      <span class="close-btn" id="close-password-modal">✖</span>
-      <h3>Archivo Protegido</h3>
-      <p>Este archivo está cifrado. Por favor, introduce la contraseña para reconstruirlo.</p>
-      <input type="password" id="password-input" placeholder="Contraseña">
-      <div class="modal-buttons">
-        <button id="confirm-password" class="btn-primary">Aceptar</button>
-        <button id="cancel-password" class="btn-secondary">Cancelar</button>
-      </div>
+    <!-- Modal de Cámara -->
+    <div id="camera-modal" class="modal">
+        <div class="modal-content">
+            <button id="close-modal" class="close-btn">&times;</button>
+            <h2>Escanear Códigos QR</h2>
+            <p class="scan-help">Apunta la cámara a los códigos QR para escanearlos automáticamente.</p>
+            <video id="camera-stream" playsinline autoplay></video>
+            <div id="scan-status" class="scan-status"></div>
+        </div>
     </div>
-  </div>
 
-  <!-- Modal para detalles de archivo -->
-  <div class="modal" id="file-details-modal">
-    <div class="modal-content">
-      <span class="close-btn" id="close-details-modal">✖</span>
-      <h3>Detalles del Archivo</h3>
-      <div id="file-details-content"></div>
+    <!-- Modal de Contraseña -->
+    <div id="password-modal" class="modal">
+        <div class="modal-content">
+            <button id="close-password-modal" class="close-btn">&times;</button>
+            <h2>Archivo Cifrado</h2>
+            <p>Este archivo está protegido con contraseña. Introduce la contraseña para continuar.</p>
+            <input type="password" id="password-input" placeholder="Contraseña">
+            <div class="modal-buttons">
+                <button id="confirm-password" class="btn-primary">Aceptar</button>
+                <button id="cancel-password" class="btn-secondary">Cancelar</button>
+            </div>
+        </div>
     </div>
-  </div>
 
-  <!-- Dependencias optimizadas -->
-  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/pako@2.1.0/dist/pako.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/argon2-browser@1.18.0/lib/argon2.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/blake2b@1.2.0/blake2b.min.js"></script>
-  <script src="reed-solomon.js"></script>
-  <script src="worker.js"></script>
-  <script src="script.js"></script>
+    <!-- Modal de Detalles -->
+    <div id="file-details-modal" class="modal">
+        <div class="modal-content">
+            <button id="close-details-modal" class="close-btn">&times;</button>
+            <h2>Detalles del Archivo</h2>
+            <div id="file-details-content"></div>
+        </div>
+    </div>
+
+    <!-- Scripts propios -->
+    <script src="reed-solomon.js"></script>
+    <script src="script.js"></script>
+    <script src="worker.js"></script>
 </body>
 </html>
