@@ -9,16 +9,21 @@ const RS_RECOVERY = 15;
 importScripts(
     'https://cdn.jsdelivr.net/npm/pako@2.1.0/dist/pako.min.js',
     'https://cdn.jsdelivr.net/npm/blake2b@1.2.0/blake2b.min.js',
-    'https://cdn.jsdelivr.net/npm/argon2-browser@1.18.0/lib/argon2.js'
+    'https://cdn.jsdelivr.net/npm/argon2-browser@1.18.0/lib/argon2.js',
+    'reed-solomon.js' // Añadido para corrección Reed-Solomon
 );
 
 // Buffer para almacenamiento eficiente de datos
 let compressedData = null;
 let currentProgress = 0;
+let metadata = null;
+let password = null;
+let isEncrypted = false;
+let processedBlocks = null;
 
 // Manejar mensajes del hilo principal
 self.onmessage = async function(event) {
-    const { type, data } = event.data;
+    const { type, data, id } = event.data;
     
     try {
         switch (type) {
@@ -41,31 +46,43 @@ self.onmessage = async function(event) {
             default:
                 throw new Error(`Tipo de mensaje no reconocido: ${type}`);
         }
+        
+        // Confirmar procesamiento exitoso
+        if (id) {
+            self.postMessage({
+                type: 'ack',
+                id: id,
+                success: true
+            });
+        }
     } catch (error) {
+        console.error('Error en worker:', error);
         self.postMessage({
             type: 'error',
-            data: error.message
+            data: error.message,
+            id: id || null
         });
     }
 };
 
 // Inicializar la reconstrucción
 async function initializeReconstruction(config) {
-    const { metadata, password, isEncrypted } = config;
+    const { metadata: configMetadata, password: configPassword, isEncrypted: configEncrypted } = config;
     
     // Validar metadatos
-    if (!metadata || !metadata.tb || !metadata.c || !metadata.b) {
+    if (!configMetadata || !configMetadata.tb || !configMetadata.c || !configMetadata.b) {
         throw new Error('Metadatos incompletos para la reconstrucción');
     }
     
     // Preparar buffer para datos comprimidos
-    compressedData = new Uint8Array(metadata.c);
+    compressedData = new Uint8Array(configMetadata.c);
     
     // Almacenar configuración
-    self.metadata = metadata;
-    self.password = password;
-    self.isEncrypted = isEncrypted;
-    self.processedBlocks = new Set();
+    metadata = configMetadata;
+    password = configPassword;
+    isEncrypted = configEncrypted;
+    processedBlocks = new Set();
+    currentProgress = 0;
     
     // Notificar inicialización exitosa
     self.postMessage({
@@ -79,20 +96,21 @@ async function initializeReconstruction(config) {
 
 // Procesar un bloque individual
 async function processBlock(blockData) {
-    if (!compressedData || !self.metadata) {
+    if (!compressedData || !metadata) {
         throw new Error('Worker no inicializado. Llama a init primero.');
     }
     
     const { index, encodedData } = blockData;
     
     // Verificar si ya procesamos este bloque
-    if (self.processedBlocks.has(index)) {
+    if (processedBlocks.has(index)) {
         self.postMessage({
             type: 'progress',
             data: {
                 current: currentProgress,
-                total: self.metadata.tb - 1,
-                skipped: true
+                total: metadata.tb - 1,
+                skipped: true,
+                index: index
             }
         });
         return;
@@ -104,8 +122,8 @@ async function processBlock(blockData) {
         
         // Descifrar si es necesario
         let decryptedData;
-        if (self.isEncrypted && self.password) {
-            decryptedData = await decryptData(encryptedData, self.password);
+        if (isEncrypted && password) {
+            decryptedData = await decryptData(encryptedData, password);
         } else {
             decryptedData = encryptedData;
         }
@@ -114,21 +132,24 @@ async function processBlock(blockData) {
         const correctedData = applyReedSolomon(decryptedData);
         
         // Colocar en la posición correcta
-        const startPos = (index - 1) * self.metadata.b;
+        const startPos = (index - 1) * metadata.b;
         const endPos = Math.min(startPos + correctedData.length, compressedData.length);
+        const lengthToCopy = endPos - startPos;
         
-        compressedData.set(correctedData.subarray(0, endPos - startPos), startPos);
+        if (lengthToCopy > 0) {
+            compressedData.set(correctedData.subarray(0, lengthToCopy), startPos);
+        }
         
         // Marcar como procesado
-        self.processedBlocks.add(index);
-        currentProgress = self.processedBlocks.size;
+        processedBlocks.add(index);
+        currentProgress = processedBlocks.size;
         
         // Notificar progreso
         self.postMessage({
             type: 'progress',
             data: {
                 current: currentProgress,
-                total: self.metadata.tb - 1,
+                total: metadata.tb - 1,
                 index: index
             }
         });
@@ -141,7 +162,7 @@ async function processBlock(blockData) {
 
 // Finalizar la reconstrucción
 async function finalizeReconstruction() {
-    if (!compressedData || !self.metadata) {
+    if (!compressedData || !metadata) {
         throw new Error('No hay datos para finalizar');
     }
     
@@ -151,18 +172,18 @@ async function finalizeReconstruction() {
         
         // Calcular hash
         const fileHash = await calculateBlake2bHash(decompressedData);
-        const hashMatches = fileHash === self.metadata.h;
+        const hashMatches = fileHash === metadata.h;
         
         // Enviar resultado al hilo principal
         self.postMessage({
             type: 'result',
             data: {
                 decompressedData: decompressedData,
-                metadata: self.metadata,
+                metadata: metadata,
                 hashMatches: hashMatches,
                 fileHash: fileHash,
-                recoveredBlocks: self.processedBlocks.size,
-                totalBlocks: self.metadata.tb - 1
+                recoveredBlocks: processedBlocks.size,
+                totalBlocks: metadata.tb - 1
             }
         });
         
@@ -178,12 +199,12 @@ async function finalizeReconstruction() {
 function resetWorker() {
     compressedData = null;
     currentProgress = 0;
-    self.metadata = null;
-    self.password = null;
-    self.isEncrypted = false;
+    metadata = null;
+    password = null;
+    isEncrypted = false;
     
-    if (self.processedBlocks) {
-        self.processedBlocks.clear();
+    if (processedBlocks) {
+        processedBlocks.clear();
     }
 }
 
@@ -204,10 +225,13 @@ function base64ToBytes(base64) {
 // Aplicar corrección de errores Reed-Solomon
 function applyReedSolomon(data) {
     try {
+        // Usar la implementación de ReedSolomon importada
         const rs = new ReedSolomon(RS_RECOVERY);
         return rs.decode(data);
     } catch (error) {
-        throw new Error(`Error en corrección Reed-Solomon: ${error.message}`);
+        console.warn('Error en corrección Reed-Solomon, intentando con datos originales:', error.message);
+        // Devolver datos originales si la corrección falla
+        return data;
     }
 }
 
@@ -281,9 +305,11 @@ async function decryptData(encryptedData, password) {
 
 // Manejar errores no capturados
 self.onerror = function(error) {
+    console.error('Error no capturado en worker:', error);
     self.postMessage({
         type: 'error',
         data: `Error no capturado en worker: ${error.message}`
     });
     resetWorker();
+    return true; // Prevenir propagación predeterminada
 };
