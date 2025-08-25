@@ -55,7 +55,7 @@
                     <div id="upload-progress-details" class="progress-details">0/0 archivos procesados</div>
                 </div>
                 
-                <div id="reconstruction-progress-container" class="progress-container" style="display: none;">
+                <div id="reconstruction-progress-container" class="progress-container enhanced" style="display: none;">
                     <div class="progress-header">
                         <h3>Reconstruyendo archivo</h3>
                         <span id="reconstruction-progress-percent" class="progress-percent">0%</span>
@@ -64,34 +64,41 @@
                         <div id="reconstruction-progress-fill" class="progress-fill"></div>
                     </div>
                     <div id="reconstruction-progress-details" class="progress-details">0/0 bloques escaneados</div>
+                    
+                    <div class="progress-stats">
+                        <span id="blocks-received">0 recibidos</span>
+                        <span id="blocks-missing">0 faltantes</span>
+                    </div>
+                    
+                    <div class="block-status" id="block-status"></div>
                 </div>
                 
                 <div id="file-info" class="file-info" style="display: none;">
                     <h3>Información del Archivo</h3>
-                    <div class="info-grid">
-                        <div class="info-item">
-                            <label>Nombre:</label>
-                            <span id="info-name">-</span>
+                    <div class="file-info-grid">
+                        <div class="file-info-item">
+                            <div class="file-info-label">Nombre:</div>
+                            <div id="info-name" class="file-info-value">-</div>
                         </div>
-                        <div class="info-item">
-                            <label>Tipo:</label>
-                            <span id="info-type">-</span>
+                        <div class="file-info-item">
+                            <div class="file-info-label">Tipo:</div>
+                            <div id="info-type" class="file-info-value">-</div>
                         </div>
-                        <div class="info-item">
-                            <label>Tamaño:</label>
-                            <span id="info-size">-</span>
+                        <div class="file-info-item">
+                            <div class="file-info-label">Tamaño:</div>
+                            <div id="info-size" class="file-info-value">-</div>
                         </div>
-                        <div class="info-item">
-                            <label>Hash (BLAKE2b):</label>
-                            <span id="info-hash" class="hash-value">-</span>
+                        <div class="file-info-item">
+                            <div class="file-info-label">Hash (BLAKE2b):</div>
+                            <div id="info-hash" class="file-info-value hash-display">-</div>
                         </div>
-                        <div class="info-item">
-                            <label>Bloques:</label>
-                            <span id="info-blocks">-</span>
+                        <div class="file-info-item">
+                            <div class="file-info-label">Bloques:</div>
+                            <div id="info-blocks" class="file-info-value">-</div>
                         </div>
-                        <div id="encrypted-info" class="info-item" style="display: none;">
-                            <label>Estado:</label>
-                            <span style="color: var(--success-color);">🔒 Cifrado</span>
+                        <div id="encrypted-info" class="file-info-item" style="display: none;">
+                            <div class="file-info-label">Estado:</div>
+                            <div class="file-info-value" style="color: var(--success-color);">🔒 Cifrado</div>
                         </div>
                     </div>
                 </div>
@@ -121,7 +128,30 @@
             <button id="close-modal" class="close-btn">&times;</button>
             <h2>Escanear Códigos QR</h2>
             <p class="scan-help">Apunta la cámara a los códigos QR para escanearlos automáticamente.</p>
-            <video id="camera-stream" playsinline autoplay></video>
+            
+            <div class="camera-container">
+                <div id="scan-overlay" class="scan-overlay">
+                    <div class="scan-guide"></div>
+                </div>
+                <video id="camera-stream" playsinline autoplay></video>
+                <div id="scan-success" class="scan-success">✓ Escaneado</div>
+            </div>
+            
+            <div class="scan-statistics">
+                <div class="stat-item">
+                    <div id="total-scanned" class="stat-value">0</div>
+                    <div class="stat-label">Total escaneos</div>
+                </div>
+                <div class="stat-item">
+                    <div id="unique-scanned" class="stat-value">0</div>
+                    <div class="stat-label">Únicos</div>
+                </div>
+                <div class="stat-item">
+                    <div id="duplicates" class="stat-value">0</div>
+                    <div class="stat-label">Duplicados</div>
+                </div>
+            </div>
+            
             <div id="scan-status" class="scan-status"></div>
         </div>
     </div>
