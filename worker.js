@@ -1,9 +1,18 @@
-// Web Worker optimizado para procesamiento de SHUMZU
+// Web Worker optimizado para procesamiento de SHUMZU - COMPATIBLE CON SHZ
 const SHUMZU_VERSION = 'SHZv4';
 const SALT_SIZE = 16;
 const NONCE_SIZE = 12;
 const TAG_SIZE = 16;
 const RS_RECOVERY = 15;
+
+// Constantes para algoritmos
+const ARGON2_PARAMS = {
+    time: 2,
+    mem: 102400,
+    parallelism: 4, // Valor fijo para consistencia en worker
+    hashLen: 32,
+    type: argon2.ArgonType.Argon2id
+};
 
 // Importar scripts necesarios
 importScripts(
@@ -94,7 +103,7 @@ async function initializeReconstruction(config) {
     });
 }
 
-// Procesar un bloque individual
+// Procesar un bloque individual - COMPATIBLE CON SHZ
 async function processBlock(blockData) {
     if (!compressedData || !metadata) {
         throw new Error('Worker no inicializado. Llama a init primero.');
@@ -160,7 +169,7 @@ async function processBlock(blockData) {
     }
 }
 
-// Finalizar la reconstrucción
+// Finalizar la reconstrucción - COMPATIBLE CON SHZ
 async function finalizeReconstruction() {
     if (!compressedData || !metadata) {
         throw new Error('No hay datos para finalizar');
@@ -222,7 +231,7 @@ function base64ToBytes(base64) {
     }
 }
 
-// Aplicar corrección de errores Reed-Solomon
+// Aplicar corrección de errores Reed-Solomon - COMPATIBLE CON SHZ
 function applyReedSolomon(data) {
     try {
         // Usar la implementación de ReedSolomon importada
@@ -235,7 +244,7 @@ function applyReedSolomon(data) {
     }
 }
 
-// Calcular hash BLAKE2b
+// Calcular hash BLAKE2b - COMPATIBLE CON SHZ
 async function calculateBlake2bHash(data) {
     try {
         const hash = blake2b(32);
@@ -248,7 +257,7 @@ async function calculateBlake2bHash(data) {
     }
 }
 
-// Descifrar datos
+// Descifrar datos - COMPATIBLE CON SHZ
 async function decryptData(encryptedData, password) {
     try {
         // Extraer salt y nonce
