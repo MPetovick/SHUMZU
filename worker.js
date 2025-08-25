@@ -10,7 +10,7 @@ importScripts(
     'https://cdn.jsdelivr.net/npm/pako@2.1.0/dist/pako.min.js',
     'https://cdn.jsdelivr.net/npm/blake2b@1.2.0/blake2b.min.js',
     'https://cdn.jsdelivr.net/npm/argon2-browser@1.18.0/lib/argon2.js',
-    'reed-solomon.js' // Añadido para corrección Reed-Solomon
+    'reed-solomon.js'
 );
 
 // Buffer para almacenamiento eficiente de datos
