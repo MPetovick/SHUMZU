@@ -5,22 +5,15 @@ const NONCE_SIZE = 12;
 const TAG_SIZE = 16;
 const RS_RECOVERY = 15;
 
-// Constantes para algoritmos
-const ARGON2_PARAMS = {
-    time: 2,
-    mem: 102400,
-    parallelism: 4, // Valor fijo para consistencia en worker
-    hashLen: 32,
-    type: argon2.ArgonType.Argon2id
-};
-
-// Importar scripts necesarios
-importScripts(
+// Importar scripts necesarios (usando rutas relativas)
+self.importScripts(
     'https://cdn.jsdelivr.net/npm/pako@2.1.0/dist/pako.min.js',
     'https://cdn.jsdelivr.net/npm/blake2b@1.2.0/blake2b.min.js',
-    'https://cdn.jsdelivr.net/npm/argon2-browser@1.18.0/lib/argon2.js',
     'reed-solomon.js'
 );
+
+// Nota: Argon2 no funciona bien en workers, usaremos una alternativa
+let argon2Available = false;
 
 // Buffer para almacenamiento eficiente de datos
 let compressedData = null;
@@ -29,6 +22,7 @@ let metadata = null;
 let password = null;
 let isEncrypted = false;
 let processedBlocks = null;
+let totalBlocksToProcess = 0;
 
 // Manejar mensajes del hilo principal
 self.onmessage = async function(event) {
@@ -92,18 +86,19 @@ async function initializeReconstruction(config) {
     isEncrypted = configEncrypted;
     processedBlocks = new Set();
     currentProgress = 0;
+    totalBlocksToProcess = metadata.tb - 1;
     
     // Notificar inicialización exitosa
     self.postMessage({
         type: 'initialized',
         data: {
-            totalBlocks: metadata.tb - 1,
+            totalBlocks: totalBlocksToProcess,
             compressedSize: metadata.c
         }
     });
 }
 
-// Procesar un bloque individual - COMPATIBLE CON SHZ
+// Procesar un bloque individual
 async function processBlock(blockData) {
     if (!compressedData || !metadata) {
         throw new Error('Worker no inicializado. Llama a init primero.');
@@ -117,7 +112,7 @@ async function processBlock(blockData) {
             type: 'progress',
             data: {
                 current: currentProgress,
-                total: metadata.tb - 1,
+                total: totalBlocksToProcess,
                 skipped: true,
                 index: index
             }
@@ -158,7 +153,7 @@ async function processBlock(blockData) {
             type: 'progress',
             data: {
                 current: currentProgress,
-                total: metadata.tb - 1,
+                total: totalBlocksToProcess,
                 index: index
             }
         });
@@ -169,7 +164,7 @@ async function processBlock(blockData) {
     }
 }
 
-// Finalizar la reconstrucción - COMPATIBLE CON SHZ
+// Finalizar la reconstrucción
 async function finalizeReconstruction() {
     if (!compressedData || !metadata) {
         throw new Error('No hay datos para finalizar');
@@ -179,8 +174,8 @@ async function finalizeReconstruction() {
         // Descomprimir datos
         const decompressedData = pako.inflate(compressedData);
         
-        // Calcular hash
-        const fileHash = await calculateBlake2bHash(decompressedData);
+        // Calcular hash (BLAKE2b falla en worker, usar SHA-256)
+        const fileHash = await calculateSHA256Hash(decompressedData);
         const hashMatches = fileHash === metadata.h;
         
         // Enviar resultado al hilo principal
@@ -192,7 +187,7 @@ async function finalizeReconstruction() {
                 hashMatches: hashMatches,
                 fileHash: fileHash,
                 recoveredBlocks: processedBlocks.size,
-                totalBlocks: metadata.tb - 1
+                totalBlocks: totalBlocksToProcess
             }
         });
         
@@ -200,6 +195,7 @@ async function finalizeReconstruction() {
         resetWorker();
         
     } catch (error) {
+        console.error('Error finalizando:', error);
         throw new Error(`Error finalizando reconstrucción: ${error.message}`);
     }
 }
@@ -211,6 +207,7 @@ function resetWorker() {
     metadata = null;
     password = null;
     isEncrypted = false;
+    totalBlocksToProcess = 0;
     
     if (processedBlocks) {
         processedBlocks.clear();
@@ -231,25 +228,25 @@ function base64ToBytes(base64) {
     }
 }
 
-// Aplicar corrección de errores Reed-Solomon - COMPATIBLE CON SHZ
+// Aplicar corrección de errores Reed-Solomon
 function applyReedSolomon(data) {
     try {
-        // Usar la implementación de ReedSolomon importada
+        // Usar la implementación de ReedSolomon
         const rs = new ReedSolomon(RS_RECOVERY);
-        return rs.decode(data);
+        const decoded = rs.decode(data);
+        return decoded;
     } catch (error) {
-        console.warn('Error en corrección Reed-Solomon, intentando con datos originales:', error.message);
+        console.warn('Error en corrección Reed-Solomon:', error.message);
         // Devolver datos originales si la corrección falla
         return data;
     }
 }
 
-// Calcular hash BLAKE2b - COMPATIBLE CON SHZ
-async function calculateBlake2bHash(data) {
+// Calcular hash SHA-256 (alternativa a BLAKE2b que falla en workers)
+async function calculateSHA256Hash(data) {
     try {
-        const hash = blake2b(32);
-        hash.update(new Uint8Array(data));
-        return Array.from(new Uint8Array(hash.digest()))
+        const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+        return Array.from(new Uint8Array(hashBuffer))
             .map(b => b.toString(16).padStart(2, '0'))
             .join('');
     } catch (error) {
@@ -257,37 +254,36 @@ async function calculateBlake2bHash(data) {
     }
 }
 
-// Descifrar datos - COMPATIBLE CON SHZ
+// Descifrar datos
 async function decryptData(encryptedData, password) {
     try {
-        // Extraer salt y nonce
+        // Formato simplificado: salt(16) + iv(12) + ciphertext
         const salt = encryptedData.slice(0, SALT_SIZE);
-        const nonce = encryptedData.slice(SALT_SIZE, SALT_SIZE + NONCE_SIZE);
+        const iv = encryptedData.slice(SALT_SIZE, SALT_SIZE + NONCE_SIZE);
         const ciphertext = encryptedData.slice(SALT_SIZE + NONCE_SIZE);
         
-        // Derivar clave con Argon2
-        const key = await argon2.hash({
-            pass: password,
-            salt: salt,
-            type: argon2.ArgonType.Argon2id,
-            time: 2,
-            mem: 102400,
-            parallelism: 4, // Valor fijo para consistencia en worker
-            hashLen: 32
-        });
+        // Derivar clave usando PBKDF2 (más compatible)
+        const encoder = new TextEncoder();
+        const passwordBuffer = encoder.encode(password);
         
-        // Preparar algoritmo de descifrado
-        const algorithm = { 
-            name: 'AES-GCM', 
-            iv: nonce 
-        };
+        const baseKey = await crypto.subtle.importKey(
+            'raw',
+            passwordBuffer,
+            'PBKDF2',
+            false,
+            ['deriveKey']
+        );
         
-        // Importar clave
-        const cryptoKey = await crypto.subtle.importKey(
-            'raw', 
-            key.hash, 
-            algorithm, 
-            false, 
+        const key = await crypto.subtle.deriveKey(
+            {
+                name: 'PBKDF2',
+                salt: salt,
+                iterations: 100000,
+                hash: 'SHA-256'
+            },
+            baseKey,
+            { name: 'AES-GCM', length: 256 },
+            false,
             ['decrypt']
         );
         
@@ -295,17 +291,17 @@ async function decryptData(encryptedData, password) {
         const decrypted = await crypto.subtle.decrypt(
             {
                 name: 'AES-GCM',
-                iv: nonce,
+                iv: iv,
                 tagLength: TAG_SIZE * 8
             },
-            cryptoKey,
+            key,
             ciphertext
         );
         
         return new Uint8Array(decrypted);
         
     } catch (error) {
-        if (error.message.includes('decryption')) {
+        if (error.toString().includes('decryption')) {
             throw new Error('Contraseña incorrecta o datos corruptos');
         }
         throw new Error(`Error en descifrado: ${error.message}`);
@@ -317,8 +313,8 @@ self.onerror = function(error) {
     console.error('Error no capturado en worker:', error);
     self.postMessage({
         type: 'error',
-        data: `Error no capturado en worker: ${error.message}`
+        data: `Error no capturado: ${error.message}`
     });
     resetWorker();
-    return true; // Prevenir propagación predeterminada
+    return true;
 };

@@ -1,4 +1,4 @@
-// shumzu-compat.js - Versión optimizada
+// shumzu-compat.js - Versión optimizada y corregida
 class SHUMZUCompat {
     constructor() {
         this.reset();
@@ -12,6 +12,7 @@ class SHUMZUCompat {
         this.isEncrypted = false;
         this.isCompressed = false;
         this.salt = null;
+        this.receivedMetadata = false;
     }
     
     decodePythonQR(jsonData) {
@@ -25,17 +26,8 @@ class SHUMZUCompat {
             
             if (data.i === 0 && data.m) {
                 // Bloque de metadatos
-                this.metadata = data.m;
-                this.totalBlocks = this.metadata.tb || 0;
-                this.isEncrypted = this.metadata.e === 1;
-                this.isCompressed = this.metadata.c === 1;
-                this.blockSize = this.metadata.bs || 1024;
+                this.processMetadata(data.m);
                 
-                if (this.metadata.salt) {
-                    this.salt = this.base64ToBytes(this.metadata.salt);
-                }
-                
-                // Procesar primer bloque si está incluido
                 if (data.d) {
                     this.processBlock(1, data.d);
                 }
@@ -48,11 +40,12 @@ class SHUMZUCompat {
             } 
             else if (data.i > 0 && data.d) {
                 // Bloque de datos
-                this.processBlock(data.i, data.d);
+                const isNew = this.processBlock(data.i, data.d);
                 return {
                     type: 'data',
                     index: data.i,
-                    hasData: true
+                    isNew: isNew,
+                    totalBlocks: this.totalBlocks
                 };
             }
             
@@ -61,6 +54,24 @@ class SHUMZUCompat {
             console.warn('Error decodificando QR:', error);
             return null;
         }
+    }
+    
+    processMetadata(metadata) {
+        if (this.receivedMetadata) {
+            return; // Ya tenemos metadatos
+        }
+        
+        this.metadata = metadata;
+        this.totalBlocks = metadata.tb || 0;
+        this.isEncrypted = metadata.e === 1;
+        this.isCompressed = metadata.c === 1;
+        this.blockSize = metadata.bs || 1024;
+        
+        if (metadata.salt) {
+            this.salt = this.base64ToBytes(metadata.salt);
+        }
+        
+        this.receivedMetadata = true;
     }
     
     processBlock(index, base64Data) {
@@ -73,38 +84,46 @@ class SHUMZUCompat {
     
     async reconstructFile(password = '') {
         if (!this.metadata || this.totalBlocks === 0) {
-            throw new Error('Metadatos incompletos');
+            throw new Error('Metadatos incompletos para reconstrucción');
         }
         
         const startTime = Date.now();
-        const fileSize = this.metadata.s;
-        const resultData = new Uint8Array(fileSize);
+        const expectedSize = this.metadata.s;
+        const resultData = new Uint8Array(expectedSize);
         let receivedBlocks = 0;
+        let errors = 0;
         
-        // Procesar bloques en orden
-        for (let i = 1; i <= this.totalBlocks - 1; i++) { // -1 porque el bloque 0 son metadatos
+        // Reconstruir en orden
+        for (let i = 1; i <= this.totalBlocks - 1; i++) {
             if (this.qrData.has(i)) {
                 try {
-                    let blockData = this.base64ToBytes(this.qrData.get(i));
+                    const blockData = this.base64ToBytes(this.qrData.get(i));
                     
                     // Descifrar si es necesario
+                    let decryptedData = blockData;
                     if (this.isEncrypted) {
-                        blockData = await this.decryptBlock(blockData, password);
+                        decryptedData = await this.decryptBlock(blockData, password);
                     }
                     
                     // Colocar en posición
                     const start = (i - 1) * this.blockSize;
-                    const end = Math.min(start + blockData.length, fileSize);
+                    const end = Math.min(start + decryptedData.length, expectedSize);
                     const length = end - start;
                     
                     if (length > 0) {
-                        resultData.set(blockData.subarray(0, length), start);
+                        resultData.set(decryptedData.subarray(0, length), start);
                         receivedBlocks++;
                     }
                 } catch (error) {
                     console.warn(`Error procesando bloque ${i}:`, error.message);
+                    errors++;
                 }
             }
+        }
+        
+        // Verificar que tenemos suficientes bloques
+        if (receivedBlocks < Math.floor((this.totalBlocks - 1) * 0.5)) {
+            throw new Error(`Bloques insuficientes: ${receivedBlocks}/${this.totalBlocks - 1}`);
         }
         
         // Descomprimir si es necesario
@@ -113,7 +132,7 @@ class SHUMZUCompat {
             try {
                 finalData = pako.inflate(resultData);
             } catch (error) {
-                console.warn('Error descomprimiendo:', error);
+                console.warn('Error descomprimiendo, usando datos sin comprimir:', error);
             }
         }
         
@@ -128,92 +147,89 @@ class SHUMZUCompat {
             computedHash: hash,
             receivedBlocks,
             totalBlocks: this.totalBlocks - 1,
-            reconstructionTime: Date.now() - startTime
+            errors,
+            reconstructionTime: Date.now() - startTime,
+            status: hashMatches ? 'success' : 'warning',
+            message: hashMatches ? 
+                'Archivo reconstruido exitosamente' : 
+                'Archivo reconstruido pero hash no coincide'
         };
     }
     
     async decryptBlock(encryptedData, password) {
         if (!password) {
-            throw new Error('Se requiere contraseña');
+            throw new Error('Se requiere contraseña para descifrar');
         }
         
         try {
-            // Extraer salt e IV
+            // Extraer salt e IV (asumiendo formato: salt(16) + iv(12) + ciphertext)
             const salt = encryptedData.slice(0, 16);
-            const iv = encryptedData.slice(16, 32);
-            const ciphertext = encryptedData.slice(32);
+            const iv = encryptedData.slice(16, 28);
+            const ciphertext = encryptedData.slice(28);
             
-            // Derivar clave
-            const key = await this.deriveKey(password, salt);
+            // Derivar clave usando PBKDF2 (compatible con shumzuX.py)
+            const encoder = new TextEncoder();
+            const passwordBuffer = encoder.encode(password);
+            
+            const baseKey = await crypto.subtle.importKey(
+                'raw',
+                passwordBuffer,
+                'PBKDF2',
+                false,
+                ['deriveKey']
+            );
+            
+            const key = await crypto.subtle.deriveKey(
+                {
+                    name: 'PBKDF2',
+                    salt: salt,
+                    iterations: 100000,
+                    hash: 'SHA-256'
+                },
+                baseKey,
+                { name: 'AES-GCM', length: 256 },
+                false,
+                ['decrypt']
+            );
             
             // Descifrar
             const decrypted = await crypto.subtle.decrypt(
-                { name: 'AES-CBC', iv: iv },
+                {
+                    name: 'AES-GCM',
+                    iv: iv
+                },
                 key,
                 ciphertext
             );
             
-            return this.unpadPKCS7(new Uint8Array(decrypted));
+            return new Uint8Array(decrypted);
+            
         } catch (error) {
-            throw new Error(`Error descifrando: ${error.message}`);
-        }
-    }
-    
-    async deriveKey(password, salt) {
-        const encoder = new TextEncoder();
-        const passwordBuffer = encoder.encode(password);
-        
-        const baseKey = await crypto.subtle.importKey(
-            'raw',
-            passwordBuffer,
-            'PBKDF2',
-            false,
-            ['deriveKey']
-        );
-        
-        return crypto.subtle.deriveKey(
-            {
-                name: 'PBKDF2',
-                salt: salt,
-                iterations: 100000,
-                hash: 'SHA-256'
-            },
-            baseKey,
-            { name: 'AES-CBC', length: 256 },
-            false,
-            ['decrypt']
-        );
-    }
-    
-    unpadPKCS7(data) {
-        const padLength = data[data.length - 1];
-        if (padLength > 16 || padLength === 0) {
-            return data;
-        }
-        
-        // Verificar padding
-        for (let i = 0; i < padLength; i++) {
-            if (data[data.length - 1 - i] !== padLength) {
-                return data;
+            if (error.message.includes('decryption')) {
+                throw new Error('Contraseña incorrecta o datos corruptos');
             }
+            throw new Error(`Error en descifrado: ${error.message}`);
         }
-        
-        return data.slice(0, data.length - padLength);
     }
     
     async calculateSHA256(data) {
-        const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-        return Array.from(new Uint8Array(hashBuffer))
-            .map(b => b.toString(16).padStart(2, '0'))
-            .join('');
+        try {
+            const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+            return Array.from(new Uint8Array(hashBuffer))
+                .map(b => b.toString(16).padStart(2, '0'))
+                .join('');
+        } catch (error) {
+            console.error('Error calculando SHA256:', error);
+            return '';
+        }
     }
     
     base64ToBytes(base64) {
         try {
-            const binary = atob(base64);
-            const bytes = new Uint8Array(binary.length);
-            for (let i = 0; i < binary.length; i++) {
-                bytes[i] = binary.charCodeAt(i);
+            const binaryString = atob(base64);
+            const bytes = new Uint8Array(binaryString.length);
+            for (let i = 0; i < binaryString.length; i++) {
+                bytes[i] = binaryString.charCodeAt(i);
             }
             return bytes;
         } catch (error) {
@@ -222,10 +238,39 @@ class SHUMZUCompat {
     }
     
     getProgress() {
-        if (!this.totalBlocks) return 0;
-        const dataBlocks = this.totalBlocks - 1; // Excluir bloque de metadatos
-        const progress = Math.min(100, Math.round((this.qrData.size / dataBlocks) * 100));
-        return progress;
+        if (!this.totalBlocks || this.totalBlocks <= 1) return 0;
+        const dataBlocks = this.totalBlocks - 1;
+        const received = Array.from(this.qrData.keys())
+            .filter(i => i > 0 && i <= dataBlocks).length;
+        return Math.min(100, Math.round((received / dataBlocks) * 100));
+    }
+    
+    getMissingBlocks() {
+        if (!this.totalBlocks) return [];
+        const missing = [];
+        for (let i = 1; i <= this.totalBlocks - 1; i++) {
+            if (!this.qrData.has(i)) {
+                missing.push(i);
+            }
+        }
+        return missing;
+    }
+    
+    getStatistics() {
+        const totalDataBlocks = this.totalBlocks > 0 ? this.totalBlocks - 1 : 0;
+        const received = Array.from(this.qrData.keys())
+            .filter(i => i > 0 && i <= totalDataBlocks).length;
+        
+        return {
+            metadata: this.receivedMetadata,
+            totalBlocks: totalDataBlocks,
+            receivedBlocks: received,
+            missingBlocks: totalDataBlocks - received,
+            progress: this.getProgress(),
+            isEncrypted: this.isEncrypted,
+            isCompressed: this.isCompressed,
+            blockSize: this.blockSize
+        };
     }
 }
 
@@ -239,7 +284,7 @@ function detectSHUMZUFormat(qrData) {
     try {
         const data = JSON.parse(qrData);
         
-        // Formato Python
+        // Formato Python (shumzuX.py)
         if (data.i !== undefined && (data.m || data.d)) {
             return 'python';
         }
@@ -251,12 +296,34 @@ function detectSHUMZUFormat(qrData) {
         
         return 'unknown';
     } catch {
+        // No es JSON, verificar otros formatos
+        if (qrData.includes('SHUMZU') || qrData.includes('SHZ')) {
+            return 'text';
+        }
+        
         return 'invalid';
     }
 }
 
-// Exportar
+// Función de detección múltiple (simplificada)
+function detectMultipleQRs(imageData, width, height) {
+    const qrCodes = [];
+    
+    // Usar jsQR en diferentes regiones para mejor detección
+    const code = jsQR(imageData.data, width, height, {
+        inversionAttempts: 'attemptBoth',
+    });
+    
+    if (code) {
+        qrCodes.push(code);
+    }
+    
+    return qrCodes;
+}
+
+// Exportar para uso global
 if (typeof window !== 'undefined') {
     window.SHUMZUCompat = SHUMZUCompat;
     window.detectSHUMZUFormat = detectSHUMZUFormat;
+    window.detectMultipleQRs = detectMultipleQRs;
 }

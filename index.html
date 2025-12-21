@@ -12,8 +12,12 @@
     <!-- Scripts de terceros -->
     <script src="https://cdn.jsdelivr.net/npm/jsQR@1.4.0/dist/jsQR.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/pako@2.1.0/dist/pako.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/crypto-js@4.2.0/crypto-js.js"></script>
+    <!-- QRCode.js para generación de QR -->
     <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+    <!-- GIF.js para generar GIF animado -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gif.js/0.2.0/gif.js"></script>
+    <!-- JSZip para crear archivos ZIP -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 </head>
 <body>
     <div class="container">
@@ -37,7 +41,7 @@
                 </div>
             </section>
 
-            <!-- Sección de Escaneo (predeterminada) -->
+            <!-- Sección de Escaneo -->
             <section id="scan-section" class="scan-section active-section">
                 <h2>Escanear Códigos QR</h2>
                 <div class="scan-options">
@@ -160,24 +164,23 @@
                 </div>
             </section>
 
-            <!-- Sección de Generación (oculta por defecto) -->
+            <!-- Sección de Generación -->
             <section id="generate-section" class="generate-section" style="display: none;">
                 <h2>Generar Códigos QR</h2>
                 
                 <div class="file-upload-area">
                     <div class="upload-area" id="drop-zone">
                         <div class="upload-icon">📁</div>
-                        <p>Arrastra y suelta archivos aquí</p>
+                        <p><strong>Arrastra y suelta archivos aquí</strong></p>
                         <p class="upload-subtext">o haz clic para seleccionar (máx. 50MB)</p>
+                        <p class="upload-subtext" style="font-size: 0.8rem; margin-top: 10px;">
+                            Formatos soportados: PDF, imágenes (JPG, PNG, GIF), texto, documentos de Office, ZIP, JSON, XML
+                        </p>
                         <input type="file" id="generate-file-input" style="display: none;">
                     </div>
                     
                     <div id="selected-file-info" class="selected-file-info" style="display: none;">
-                        <div class="file-preview">
-                            <span id="selected-file-name"></span>
-                            <span id="selected-file-size" class="file-size"></span>
-                            <button id="remove-file" class="btn-cancel small">✕</button>
-                        </div>
+                        <!-- Se llenará dinámicamente -->
                     </div>
                 </div>
                 
@@ -203,14 +206,40 @@
                     </div>
                     
                     <div class="option-group">
+                        <label for="frame-delay">Delay entre QR (ms):</label>
+                        <select id="frame-delay">
+                            <option value="200">200ms (Rápido)</option>
+                            <option value="500" selected>500ms (Normal)</option>
+                            <option value="1000">1000ms (Lento)</option>
+                            <option value="2000">2000ms (Muy lento)</option>
+                        </select>
+                    </div>
+                    
+                    <div class="option-group">
                         <label for="encryption-toggle">
                             <input type="checkbox" id="encryption-toggle">
-                            <span>🔒 Habilitar cifrado</span>
+                            <span>🔒 Habilitar cifrado AES-256</span>
                         </label>
-                        <div id="encryption-options" style="display: none; margin-top: 10px;">
-                            <input type="password" id="encryption-password" placeholder="Contraseña (mín. 8 caracteres)">
-                            <input type="password" id="encryption-confirm" placeholder="Confirmar contraseña" style="margin-top: 5px;">
+                        <div id="encryption-options" style="display: none; margin-top: 15px; padding: 15px; background: rgba(0,0,0,0.03); border-radius: 8px;">
+                            <div style="margin-bottom: 10px;">
+                                <input type="password" id="encryption-password" placeholder="Contraseña (mín. 8 caracteres)" style="width: 100%; padding: 10px;">
+                            </div>
+                            <div>
+                                <input type="password" id="encryption-confirm" placeholder="Confirmar contraseña" style="width: 100%; padding: 10px;">
+                            </div>
+                            <p style="font-size: 0.8rem; color: #666; margin-top: 10px;">
+                                🔐 La contraseña se usará para cifrar cada bloque con AES-256 GCM
+                            </p>
                         </div>
+                    </div>
+                    
+                    <div class="option-group">
+                        <label for="output-format">Formato de salida:</label>
+                        <select id="output-format">
+                            <option value="gif">GIF Animado</option>
+                            <option value="zip" selected>ZIP con imágenes PNG</option>
+                            <option value="both">Ambos formatos</option>
+                        </select>
                     </div>
                     
                     <div class="option-group">
@@ -224,25 +253,45 @@
                 <div class="generation-progress" style="display: none;">
                     <div class="progress-header">
                         <h3>Generando códigos QR</h3>
-                        <span id="generation-progress-percent">0%</span>
+                        <span id="generation-progress-percent" class="progress-percent">0%</span>
                     </div>
                     <div class="progress-bar">
                         <div id="generation-progress-fill" class="progress-fill"></div>
                     </div>
                     <div class="progress-details">
                         <span id="generation-status">Preparando...</span>
-                        <span id="qr-count">0 códigos</span>
+                        <span id="qr-count">0/0 códigos</span>
                     </div>
+                    <div class="block-grid" id="generation-block-grid"></div>
                 </div>
                 
-                <div class="qr-gallery" id="qr-gallery"></div>
+                <div class="qr-preview-container">
+                    <div class="section-header">
+                        <h3>Vista previa</h3>
+                        <div class="preview-controls">
+                            <button id="prev-qr" class="btn-secondary small" disabled>← Anterior</button>
+                            <span id="current-qr-index">0/0</span>
+                            <button id="next-qr" class="btn-secondary small" disabled>Siguiente →</button>
+                        </div>
+                    </div>
+                    <div class="qr-preview" id="qr-preview">
+                        <canvas id="qr-canvas-preview" width="300" height="300"></canvas>
+                        <div class="qr-info">
+                            <div class="qr-type" id="qr-type">Tipo: -</div>
+                            <div class="qr-size" id="qr-data-size">Datos: -</div>
+                        </div>
+                    </div>
+                </div>
                 
                 <div class="action-buttons">
                     <button id="generate-qr" class="btn-primary" disabled>
                         <span>⚡ Generar Códigos QR</span>
                     </button>
-                    <button id="download-all" class="btn-secondary" disabled>
-                        <span>📥 Descargar Todos (.zip)</span>
+                    <button id="download-gif" class="btn-secondary" disabled>
+                        <span>🎬 Descargar GIF</span>
+                    </button>
+                    <button id="download-zip" class="btn-secondary" disabled>
+                        <span>📦 Descargar ZIP</span>
                     </button>
                     <button id="reset-generation" class="btn-cancel">
                         <span>🗑️ Limpiar</span>
@@ -275,15 +324,13 @@
             <p class="scan-help">Apunte la cámara a los códigos QR. La detección es automática.</p>
             
             <div class="camera-container">
-                <div class="camera-controls">
-                    <button id="switch-camera" class="btn-secondary small">🔄 Cambiar cámara</button>
-                    <button id="toggle-torch" class="btn-secondary small">💡 Linterna</button>
-                </div>
                 <div class="camera-wrapper">
                     <video id="camera-stream" playsinline autoplay></video>
                     <div class="scan-overlay">
+                        <div class="scan-grid">
+                            <!-- Celdas generadas dinámicamente -->
+                        </div>
                         <div class="scan-guide"></div>
-                        <div class="scan-target"></div>
                     </div>
                     <div id="scan-feedback" class="scan-feedback"></div>
                 </div>
@@ -329,7 +376,7 @@
             <p class="password-hint">Nota: Use la misma contraseña que usó con shumzuX.py</p>
             <div class="modal-buttons">
                 <button id="confirm-password" class="btn-primary">Descifrar</button>
-                                <button id="cancel-password" class="btn-secondary">Cancelar</button>
+                <button id="cancel-password" class="btn-secondary">Cancelar</button>
             </div>
         </div>
     </div>
