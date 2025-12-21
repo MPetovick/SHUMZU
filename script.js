@@ -1,1292 +1,959 @@
-// script.js - Versión completamente mejorada y compatible con SHZ
-// Configuración global compatible con SHUMZU+ Python
-const SHUMZU_VERSION = 'SHZv4';
-const SALT_SIZE = 16;
-const NONCE_SIZE = 12;
-const TAG_SIZE = 16;
-const QR_SIZE = 512;
-const MAX_HISTORY_ITEMS = 20;
-const RS_RECOVERY = 15; // 15% de símbolos de recuperación
-
-// Constantes para algoritmos
-const ARGON2_PARAMS = {
-    time: 2,
-    mem: 102400,
-    parallelism: navigator.hardwareConcurrency || 4,
-    hashLen: 32,
-    type: argon2.ArgonType.Argon2id
+// script.js - Versión mejorada con escaneo ultrarrápido
+const SCAN_CONFIG = {
+    FPS_TARGET: 5,          // 5 FPS para balance entre velocidad y CPU
+    SCAN_INTERVAL: 200,     // 200ms entre escaneos
+    MAX_FRAME_SKIP: 2,      // Máximo frames a saltar
+    DETECTION_THRESHOLD: 0.7, // Umbral de confianza
+    AUTO_RECONSTRUCT: true,
+    IGNORE_DUPLICATES: true,
+    RESOLUTION: { width: 1280, height: 720 }
 };
 
-let collectedBlocks = new Map();
-let totalBlocks = 0;
-let metadata = null;
-let scannerActive = false;
-let videoStream = null;
-let filePassword = null;
-let isFileEncrypted = false;
-let scanAnimationFrame = null;
-let processingWorker = null;
-let messageCounter = 0;
-let scanStatistics = {
-    totalScanned: 0,
-    uniqueScanned: 0,
-    duplicates: 0,
-    lastScanTime: 0
-};
-
-// Elementos DOM
-const openCameraBtn = document.getElementById('open-camera');
-const fileInput = document.getElementById('file-input');
-const cameraModal = document.getElementById('camera-modal');
-const closeModalBtn = document.getElementById('close-modal');
-const cameraStream = document.getElementById('camera-stream');
-const scanOverlay = document.getElementById('scan-overlay');
-const scanSuccess = document.getElementById('scan-success');
-const totalScannedEl = document.getElementById('total-scanned');
-const uniqueScannedEl = document.getElementById('unique-scanned');
-const duplicatesEl = document.getElementById('duplicates');
-const reconstructionProgressContainer = document.getElementById('reconstruction-progress-container');
-const reconstructionProgressFill = document.getElementById('reconstruction-progress-fill');
-const reconstructionProgressPercent = document.getElementById('reconstruction-progress-percent');
-const reconstructionProgressDetails = document.getElementById('reconstruction-progress-details');
-const uploadProgressContainer = document.getElementById('upload-progress-container');
-const uploadProgressFill = document.getElementById('upload-progress-fill');
-const uploadProgressPercent = document.getElementById('upload-progress-percent');
-const uploadProgressDetails = document.getElementById('upload-progress-details');
-const fileInfoSection = document.getElementById('file-info');
-const infoName = document.getElementById('info-name');
-const infoType = document.getElementById('info-type');
-const infoSize = document.getElementById('info-size');
-const infoHash = document.getElementById('info-hash');
-const infoBlocks = document.getElementById('info-blocks');
-const blockStatusContainer = document.getElementById('block-status');
-const encryptedInfo = document.getElementById('encrypted-info');
-const historyList = document.getElementById('history-list');
-const clearHistoryBtn = document.getElementById('clear-history');
-const scanStatus = document.getElementById('scan-status');
-const reconstructBtn = document.getElementById('reconstruct-btn');
-const themeToggle = document.getElementById('theme-toggle');
-const passwordModal = document.getElementById('password-modal');
-const closePasswordModalBtn = document.getElementById('close-password-modal');
-const passwordInput = document.getElementById('password-input');
-const confirmPasswordBtn = document.getElementById('confirm-password');
-const cancelPasswordBtn = document.getElementById('cancel-password');
-const fileDetailsModal = document.getElementById('file-details-modal');
-const closeDetailsModalBtn = document.getElementById('close-details-modal');
-const fileDetailsContent = document.getElementById('file-details-content');
-
-// Inicialización
-document.addEventListener('DOMContentLoaded', () => {
-    openCameraBtn.addEventListener('click', openCamera);
-    closeModalBtn.addEventListener('click', closeCamera);
-    fileInput.addEventListener('change', handleFileUpload);
-    clearHistoryBtn.addEventListener('click', clearHistory);
-    reconstructBtn.addEventListener('click', handleReconstructClick);
-    themeToggle.addEventListener('click', toggleTheme);
-    closePasswordModalBtn.addEventListener('click', closePasswordModal);
-    confirmPasswordBtn.addEventListener('click', confirmPassword);
-    cancelPasswordBtn.addEventListener('click', closePasswordModal);
-    closeDetailsModalBtn.addEventListener('click', closeDetailsModal);
-    
-    // Cargar tema desde localStorage
-    const savedTheme = localStorage.getItem('shumzu-theme') || 'light';
-    setTheme(savedTheme);
-    
-    // Cargar historial desde localStorage
-    loadHistory();
-    
-    // Agregar listener para tecla Escape
-    document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape') {
-            closeCamera();
-            closePasswordModal();
-            closeDetailsModal();
-        }
+class UltraScanner {
+    constructor() {
+        this.stream = null;
+        this.canvas = document.createElement('canvas');
+        this.ctx = this.canvas.getContext('2d');
+        this.scanning = false;
+        this.lastScanTime = 0;
+        this.frameCount = 0;
+        this.qrCount = 0;
+        this.fps = 0;
+        this.scanInterval = null;
+        this.cameras = [];
+        this.currentCamera = 'environment';
+        this.torchEnabled = false;
         
-        // Enter en modal de contraseña
-        if (e.key === 'Enter' && passwordModal.style.display === 'flex') {
-            confirmPassword();
-        }
-    });
-    
-    // Inicializar Web Worker
-    if (window.Worker) {
-        processingWorker = new Worker('worker.js');
-        processingWorker.onmessage = handleWorkerMessage;
-        processingWorker.onerror = (error) => {
-            console.error('Error en Worker:', error);
-            showNotification('Error en procesamiento de datos', 'error');
-        };
-    } else {
-        showNotification('Web Workers no soportados. Algunas funciones estarán limitadas.', 'warning', 5000);
-    }
-    
-    // Verificar disponibilidad de APIs necesarias
-    checkRequiredAPIs();
-    
-    // Inicializar estadísticas de escaneo
-    updateScanStatistics();
-});
-
-// Verificar APIs necesarias
-function checkRequiredAPIs() {
-    const requiredAPIs = [
-        { name: 'MediaDevices', available: !!navigator.mediaDevices },
-        { name: 'Blob', available: !!window.Blob },
-        { name: 'FileReader', available: !!window.FileReader },
-        { name: 'crypto.subtle', available: !!window.crypto && !!window.crypto.subtle },
-        { name: 'Web Workers', available: !!window.Worker }
-    ];
-    
-    const missingAPIs = requiredAPIs.filter(api => !api.available);
-    
-    if (missingAPIs.length > 0) {
-        showNotification(`Funcionalidades no disponibles: ${missingAPIs.map(api => api.name).join(', ')}. Actualiza tu navegador.`, 'error', 10000);
-    }
-}
-
-// Cambiar entre temas claro y oscuro
-function toggleTheme() {
-    const currentTheme = document.body.getAttribute('data-theme') || 'light';
-    const newTheme = currentTheme === 'light' ? 'dark' : 'light';
-    setTheme(newTheme);
-}
-
-function setTheme(theme) {
-    document.body.setAttribute('data-theme', theme);
-    localStorage.setItem('shumzu-theme', theme);
-    themeToggle.textContent = theme === 'light' ? '🌙' : '☀️';
-}
-
-// Actualizar estadísticas de escaneo
-function updateScanStatistics() {
-    totalScannedEl.textContent = scanStatistics.totalScanned;
-    uniqueScannedEl.textContent = scanStatistics.uniqueScanned;
-    duplicatesEl.textContent = scanStatistics.duplicates;
-}
-
-// Abrir cámara para escanear QR dinámicos
-async function openCamera() {
-    try {
-        cameraModal.style.display = 'flex';
-        scanStatistics = {
+        // Estadísticas en tiempo real
+        this.stats = {
             totalScanned: 0,
-            uniqueScanned: 0,
+            uniqueBlocks: 0,
             duplicates: 0,
-            lastScanTime: 0
+            scanSpeed: 0,
+            lastScanTimestamps: []
         };
-        updateScanStatistics();
         
-        videoStream = await navigator.mediaDevices.getUserMedia({ 
-            video: { 
-                facingMode: 'environment',
-                width: { ideal: 1280 },
-                height: { ideal: 720 }
-            } 
-        });
-        cameraStream.srcObject = videoStream;
-        scannerActive = true;
-        startQRScanning();
-        updateScanStatus('Cámara activada. Escaneando...', 'info');
-    } catch (error) {
-        console.error('Error al acceder a la cámara:', error);
-        showNotification('No se pudo acceder a la cámara. Asegúrate de permitir el acceso.', 'error');
-    }
-}
-
-// Cerrar cámara
-function closeCamera() {
-    scannerActive = false;
-    if (scanAnimationFrame) {
-        cancelAnimationFrame(scanAnimationFrame);
-        scanAnimationFrame = null;
-    }
-    if (videoStream) {
-        videoStream.getTracks().forEach(track => track.stop());
-        videoStream = null;
-    }
-    cameraModal.style.display = 'none';
-    updateScanStatus('', 'info');
-    scanOverlay.classList.remove('active');
-}
-
-// Manejar subida de archivos (QR estáticos)
-function handleFileUpload(event) {
-    const files = event.target.files;
-    if (!files.length) return;
-    
-    // Mostrar barra de progreso para la carga
-    uploadProgressContainer.style.display = 'block';
-    updateUploadProgress(0, files.length);
-    
-    // Procesar archivos según su tipo
-    let processed = 0;
-    const totalFiles = files.length;
-    
-    Array.from(files).forEach(file => {
-        if (file.type.startsWith('image/')) {
-            processImageFile(file, processed, totalFiles);
-        } else if (file.type.startsWith('video/') || file.name.endsWith('.gif')) {
-            processVideoFile(file, processed, totalFiles);
-        } else {
-            console.warn('Formato de archivo no compatible:', file.type);
-            processed++;
-            updateUploadProgress(processed, totalFiles);
-        }
-    });
-}
-
-// Procesar archivo de imagen
-function processImageFile(file, processed, totalFiles) {
-    const reader = new FileReader();
-    reader.onload = e => {
-        const img = new Image();
-        img.onload = () => {
-            // Verificar si es una matriz (múltiples QR en una imagen)
-            if (img.width > QR_SIZE * 1.5 || img.height > QR_SIZE * 1.5) {
-                processMatrixImage(img, file.name, processed, totalFiles);
-            } else {
-                // Es un QR individual
-                decodeQRFromImage(e.target.result, file.name)
-                    .then(result => {
-                        if (result) {
-                            showNotification(`QR decodificado de ${file.name}`, 'success');
-                        }
-                        processed++;
-                        updateUploadProgress(processed, totalFiles);
-                        
-                        if (processed === totalFiles) {
-                            showNotification(`${totalFiles} archivo(s) procesado(s)`, 'info');
-                            if (collectedBlocks.size > 0) {
-                                reconstructBtn.style.display = 'block';
-                            }
-                        }
-                    })
-                    .catch(error => {
-                        console.error('Error procesando imagen:', error);
-                        showNotification(`Error al procesar ${file.name}`, 'error');
-                        processed++;
-                        updateUploadProgress(processed, totalFiles);
-                    });
-            }
-        };
-        img.onerror = () => {
-            console.error('Error cargando imagen:', file.name);
-            processed++;
-            updateUploadProgress(processed, totalFiles);
-        };
-        img.src = e.target.result;
-    };
-    reader.onerror = () => {
-        console.error('Error leyendo archivo:', file.name);
-        processed++;
-        updateUploadProgress(processed, totalFiles);
-    };
-    reader.readAsDataURL(file);
-}
-
-// Procesar imagen matricial (múltiples QR)
-function processMatrixImage(img, filename, processed, totalFiles) {
-    const cols = Math.ceil(img.width / QR_SIZE);
-    const rows = Math.ceil(img.height / QR_SIZE);
-    const totalTiles = cols * rows;
-    let decodedTiles = 0;
-    
-    if (totalTiles === 0) {
-        processed++;
-        updateUploadProgress(processed, totalFiles);
-        return;
+        // Cache para QR detectados
+        this.qrCache = new Set();
+        
+        // Compatibilidad con Python
+        this.compat = new SHUMZUCompat();
     }
     
-    const canvas = document.createElement('canvas');
-    canvas.width = QR_SIZE;
-    canvas.height = QR_SIZE;
-    const ctx = canvas.getContext('2d');
-    
-    for (let row = 0; row < rows; row++) {
-        for (let col = 0; col < cols; col++) {
-            // Dibujar el tile en el canvas
-            ctx.clearRect(0, 0, QR_SIZE, QR_SIZE);
-            ctx.drawImage(
-                img, 
-                col * QR_SIZE, 
-                row * QR_SIZE, 
-                QR_SIZE, 
-                QR_SIZE,
-                0, 
-                0, 
-                QR_SIZE, 
-                QR_SIZE
-            );
+    async initialize() {
+        try {
+            // Obtener lista de cámaras
+            const devices = await navigator.mediaDevices.enumerateDevices();
+            this.cameras = devices.filter(device => device.kind === 'videoinput');
             
-            // Convertir a data URL y decodificar
-            const dataUrl = canvas.toDataURL('image/png');
-            decodeQRFromImage(dataUrl, `${filename}_tile_${row}_${col}`)
-                .then(result => {
-                    decodedTiles++;
-                    if (decodedTiles === totalTiles) {
-                        processed++;
-                        updateUploadProgress(processed, totalFiles);
-                        
-                        if (processed === totalFiles) {
-                            showNotification(`${totalFiles} archivo(s) procesado(s)`, 'info');
-                            if (collectedBlocks.size > 0) {
-                                reconstructBtn.style.display = 'block';
-                            }
-                        }
-                    }
-                })
-                .catch(error => {
-                    console.error(`Error procesando tile ${row}-${col}:`, error);
-                    decodedTiles++;
-                    if (decodedTiles === totalTiles) {
-                        processed++;
-                        updateUploadProgress(processed, totalFiles);
-                    }
-                });
+            // Iniciar con cámara trasera por defecto
+            await this.startCamera('environment');
+            return true;
+        } catch (error) {
+            console.error('Error inicializando escáner:', error);
+            return false;
         }
     }
-}
-
-// Procesar archivo de video o GIF
-function processVideoFile(file, processed, totalFiles) {
-    const url = URL.createObjectURL(file);
     
-    if (file.type === 'image/gif') {
-        processGifFile(url, file.name, processed, totalFiles);
-    } else {
-        processVideoFrames(url, file.name, processed, totalFiles);
-    }
-}
-
-// Procesar archivo GIF
-function processGifFile(url, filename, processed, totalFiles) {
-    const img = new Image();
-    img.onload = function() {
-        // Crear canvas para extraer frames
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
-        canvas.width = img.width;
-        canvas.height = img.height;
-        
-        // Simular extracción de frames (simplificado)
-        const framesToProcess = 10; // Límite de frames a procesar
-        let framesProcessed = 0;
-        
-        for (let i = 0; i < framesToProcess; i++) {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            ctx.drawImage(img, 0, 0);
-            
-            // Decodificar QR del frame
-            decodeQRFromImage(canvas.toDataURL(), `${filename}_frame_${i}`)
-                .then(result => {
-                    framesProcessed++;
-                    if (framesProcessed === framesToProcess) {
-                        processed++;
-                        updateUploadProgress(processed, totalFiles);
-                        URL.revokeObjectURL(url);
-                        
-                        if (processed === totalFiles) {
-                            showNotification(`${totalFiles} archivo(s) procesado(s)`, 'info');
-                            if (collectedBlocks.size > 0) {
-                                reconstructBtn.style.display = 'block';
-                            }
-                        }
-                    }
-                })
-                .catch(error => {
-                    console.error('Error procesando frame GIF:', error);
-                    framesProcessed++;
-                    if (framesProcessed === framesToProcess) {
-                        processed++;
-                        updateUploadProgress(processed, totalFiles);
-                        URL.revokeObjectURL(url);
-                    }
-                });
-        }
-    };
-    img.onerror = function() {
-        console.error('Error cargando GIF:', filename);
-        URL.revokeObjectURL(url);
-        processed++;
-        updateUploadProgress(processed, totalFiles);
-    };
-    img.src = url;
-}
-
-// Procesar video extrayendo frames
-function processVideoFrames(url, filename, processed, totalFiles) {
-    const video = document.createElement('video');
-    video.src = url;
-    video.muted = true;
-    video.playsInline = true;
-    
-    let framesProcessed = 0;
-    let decodedFrames = 0;
-    
-    video.onloadedmetadata = () => {
-        const duration = video.duration;
-        // Limitar a 30 frames máximo para no sobrecargar
-        const frameCount = Math.min(30, Math.floor(duration * 3));
-        
-        if (frameCount === 0) {
-            processed++;
-            updateUploadProgress(processed, totalFiles);
-            URL.revokeObjectURL(url);
-            return;
-        }
-        
-        // Extraer frames a intervalos regulares
-        const processNextFrame = (index) => {
-            if (index >= frameCount) {
-                URL.revokeObjectURL(url);
-                processed++;
-                updateUploadProgress(processed, totalFiles);
-                
-                if (processed === totalFiles) {
-                    showNotification(`${totalFiles} archivo(s) procesado(s)`, 'info');
-                    if (collectedBlocks.size > 0) {
-                        reconstructBtn.style.display = 'block';
-                    }
-                }
-                return;
+    async startCamera(facingMode = 'environment') {
+        try {
+            if (this.stream) {
+                this.stopCamera();
             }
             
-            const time = (index / frameCount) * duration;
-            video.currentTime = time;
-            
-            video.onseeked = () => {
-                // Capturar frame actual
-                const canvas = document.createElement('canvas');
-                canvas.width = video.videoWidth;
-                canvas.height = video.videoHeight;
-                const ctx = canvas.getContext('2d');
-                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-                
-                // Decodificar QR del frame
-                decodeQRFromImage(canvas.toDataURL(), `frame_${index}`)
-                    .then(result => {
-                        if (result) decodedFrames++;
-                        framesProcessed++;
-                        
-                        if (framesProcessed === frameCount) {
-                            showNotification(`${decodedFrames} frames decodificados de ${filename}`, 'info');
-                        }
-                        
-                        // Procesar siguiente frame
-                        processNextFrame(index + 1);
-                    })
-                    .catch(error => {
-                        console.error('Error procesando frame:', error);
-                        framesProcessed++;
-                        processNextFrame(index + 1);
-                    });
+            const constraints = {
+                video: {
+                    facingMode: facingMode,
+                    width: { ideal: SCAN_CONFIG.RESOLUTION.width },
+                    height: { ideal: SCAN_CONFIG.RESOLUTION.height },
+                    frameRate: { ideal: 30 }
+                },
+                audio: false
             };
-        };
-        
-        processNextFrame(0);
-    };
-    
-    video.onerror = () => {
-        console.error('Error cargando video:', filename);
-        URL.revokeObjectURL(url);
-        processed++;
-        updateUploadProgress(processed, totalFiles);
-    };
-    
-    video.load();
-}
-
-// Decodificar QR desde imagen
-function decodeQRFromImage(dataUrl, filename) {
-    return new Promise((resolve, reject) => {
-        const img = new Image();
-        img.onload = () => {
-            const canvas = document.createElement('canvas');
-            const ctx = canvas.getContext('2d');
-            canvas.width = img.width;
-            canvas.height = img.height;
-            ctx.drawImage(img, 0, 0, img.width, img.height);
             
-            try {
-                const imageData = ctx.getImageData(0, 0, img.width, img.height);
-                const code = jsQR(imageData.data, imageData.width, imageData.height, {
-                    inversionAttempts: 'dontInvert',
-                });
-                
-                if (code) {
-                    processQRData(code.data, filename);
-                    resolve(true);
-                } else {
-                    console.warn('No se detectó código QR en la imagen:', filename);
-                    resolve(false);
-                }
-            } catch (error) {
-                reject(error);
-            }
-        };
-        img.onerror = reject;
-        img.src = dataUrl;
-    });
-}
-
-// Actualizar progreso de carga de archivos
-function updateUploadProgress(processed, total) {
-    const progress = Math.round((processed / total) * 100);
-    uploadProgressPercent.textContent = `${progress}%`;
-    uploadProgressFill.style.width = `${progress}%`;
-    uploadProgressDetails.textContent = `${processed}/${total} archivos procesados`;
-    
-    // Ocultar barra de progreso cuando se complete
-    if (processed === total) {
-        setTimeout(() => {
-            uploadProgressContainer.style.display = 'none';
-        }, 2000);
-    }
-}
-
-// Iniciar escaneo continuo desde cámara
-function startQRScanning() {
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-    let lastScanTime = 0;
-    const scanInterval = 300; // Escanear cada 300ms para mejorar rendimiento
-    
-    function scanFrame() {
-        if (!scannerActive || !videoStream) return;
-        
-        const currentTime = Date.now();
-        if (currentTime - lastScanTime < scanInterval) {
-            scanAnimationFrame = requestAnimationFrame(scanFrame);
-            return;
-        }
-        
-        lastScanTime = currentTime;
-        
-        if (cameraStream.readyState === cameraStream.HAVE_ENOUGH_DATA) {
-            canvas.width = cameraStream.videoWidth;
-            canvas.height = cameraStream.videoHeight;
-            ctx.drawImage(cameraStream, 0, 0, canvas.width, canvas.height);
-            
-            try {
-                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-                const code = jsQR(imageData.data, imageData.width, imageData.height, {
-                    inversionAttempts: 'dontInvert',
-                });
-                
-                if (code) {
-                    processQRData(code.data, 'live-camera');
-                    // Feedback visual al detectar QR
-                    scanOverlay.classList.add('active');
-                    scanSuccess.style.display = 'block';
-                    setTimeout(() => {
-                        scanOverlay.classList.remove('active');
-                        scanSuccess.style.display = 'none';
-                    }, 1000);
-                    
-                    // Actualizar estadísticas
-                    scanStatistics.totalScanned++;
-                    scanStatistics.lastScanTime = Date.now();
-                    updateScanStatistics();
-                }
-            } catch (error) {
-                console.error('Error en escaneo:', error);
-            }
-        }
-        
-        if (scannerActive) {
-            scanAnimationFrame = requestAnimationFrame(scanFrame);
+            this.stream = await navigator.mediaDevices.getUserMedia(constraints);
+            this.currentCamera = facingMode;
+            return this.stream;
+        } catch (error) {
+            console.error('Error accediendo a la cámara:', error);
+            throw error;
         }
     }
     
-    scanAnimationFrame = requestAnimationFrame(scanFrame);
-}
-
-// Procesar datos del QR - COMPATIBLE CON SHZ
-function processQRData(data, source) {
-    try {
-        const qrData = JSON.parse(data);
+    async switchCamera() {
+        try {
+            const newMode = this.currentCamera === 'environment' ? 'user' : 'environment';
+            await this.startCamera(newMode);
+            return newMode;
+        } catch (error) {
+            console.error('Error cambiando cámara:', error);
+            return this.currentCamera;
+        }
+    }
+    
+    async toggleTorch() {
+        try {
+            const track = this.stream?.getVideoTracks()[0];
+            if (track && 'applyConstraints' in track) {
+                this.torchEnabled = !this.torchEnabled;
+                await track.applyConstraints({
+                    advanced: [{ torch: this.torchEnabled }]
+                });
+            }
+            return this.torchEnabled;
+        } catch (error) {
+            console.warn('Linterna no soportada:', error);
+            return false;
+        }
+    }
+    
+    startScanning(videoElement, callback) {
+        if (!this.stream || this.scanning) return;
         
-        // Validar formato SHUMZU
-        if (!qrData.v || qrData.v !== SHUMZU_VERSION) {
-            console.warn('QR no válido (versión incorrecta):', source);
+        this.scanning = true;
+        this.frameCount = 0;
+        this.lastScanTime = Date.now();
+        this.stats.lastScanTimestamps = [];
+        
+        // Configurar canvas
+        this.canvas.width = SCAN_CONFIG.RESOLUTION.width;
+        this.canvas.height = SCAN_CONFIG.RESOLUTION.height;
+        
+        // Iniciar bucle de escaneo
+        this.scanInterval = setInterval(() => {
+            this.processFrame(videoElement, callback);
+        }, SCAN_CONFIG.SCAN_INTERVAL);
+        
+        // Actualizar FPS cada segundo
+        setInterval(() => {
+            const now = Date.now();
+            const elapsed = (now - this.lastScanTime) / 1000;
+            this.fps = elapsed > 0 ? this.frameCount / elapsed : 0;
+            this.frameCount = 0;
+            this.lastScanTime = now;
+        }, 1000);
+    }
+    
+    processFrame(video, callback) {
+        if (!video || video.readyState !== video.HAVE_ENOUGH_DATA) {
             return;
         }
         
-        const index = qrData.i;
-        const encodedData = qrData.d;
-        
-        // Si es el bloque de metadatos (índice 0)
-        if (index === 0) {
-            try {
-                // Decodificar metadatos
-                const decodedMetadata = atob(encodedData);
-                metadata = JSON.parse(decodedMetadata);
-                totalBlocks = metadata.tb;
-                
-                // Mostrar información del archivo
-                displayFileInfo(metadata);
-                showNotification(`Archivo detectado: ${metadata.n} (${totalBlocks-1} bloques)`, 'info');
-                
-                // Mostrar contenedor de progreso
-                reconstructionProgressContainer.style.display = 'block';
-                updateReconstructionProgress();
-                
-                // Verificar si el archivo está cifrado
-                if (metadata.e) { // Campo 'e' indica si está cifrado
-                    isFileEncrypted = true;
-                    encryptedInfo.style.display = 'flex';
-                }
-            } catch (e) {
-                console.error('Error al procesar metadatos:', e);
-                return;
+        try {
+            // Dibujar frame en canvas
+            this.ctx.drawImage(video, 0, 0, this.canvas.width, this.canvas.height);
+            this.frameCount++;
+            
+            // Obtener datos de imagen
+            const imageData = this.ctx.getImageData(0, 0, this.canvas.width, this.canvas.height);
+            
+            // Escanear QR
+            const code = jsQR(imageData.data, imageData.width, imageData.height, {
+                inversionAttempts: 'dontInvert',
+            });
+            
+            if (code) {
+                this.handleQRCode(code.data, callback);
             }
-        }
-        
-        // Almacenar bloque
-        if (!collectedBlocks.has(index)) {
-            collectedBlocks.set(index, encodedData);
-            console.log(`Bloque ${index} recibido de: ${source}`);
             
             // Actualizar estadísticas
-            scanStatistics.uniqueScanned++;
-            updateScanStatistics();
+            this.updateStats();
             
-            // Actualizar estado de escaneo
-            if (source === 'live-camera') {
-                updateScanStatus(`Bloque ${index}/${totalBlocks-1} escaneado`, 'success');
-            }
+        } catch (error) {
+            console.error('Error procesando frame:', error);
+        }
+    }
+    
+    handleQRCode(data, callback) {
+        this.stats.totalScanned++;
+        
+        try {
+            // Detectar formato
+            const format = detectSHUMZUFormat(data);
             
-            updateReconstructionProgress();
-            
-            // Mostrar el botón de reconstruir si hay bloques
-            if (collectedBlocks.size > 0) {
-                reconstructBtn.style.display = 'block';
-            }
-            
-            // Verificar si tenemos todos los bloques
-            if (collectedBlocks.size === totalBlocks && totalBlocks > 0) {
-                showNotification('¡Todos los bloques recibidos! Reconstruyendo archivo...', 'success');
-                setTimeout(() => {
-                    if (isFileEncrypted) {
-                        openPasswordModal();
-                    } else {
-                        reconstructFile();
+            if (format === 'python') {
+                // Procesar QR de Python
+                const result = this.compat.decodePythonQR(data);
+                
+                if (result) {
+                    const isNew = !this.qrCache.has(data);
+                    
+                    if (isNew || !SCAN_CONFIG.IGNORE_DUPLICATES) {
+                        this.stats.uniqueBlocks = this.compat.qrData.size;
+                        
+                        if (isNew) {
+                            this.qrCache.add(data);
+                            callback({
+                                data: data,
+                                format: 'python',
+                                isNew: true,
+                                metadata: result.metadata,
+                                progress: this.compat.getProgress()
+                            });
+                        } else {
+                            this.stats.duplicates++;
+                            callback({
+                                data: data,
+                                format: 'python',
+                                isNew: false,
+                                isDuplicate: true
+                            });
+                        }
                     }
-                }, 1000);
-            }
-        } else {
-            // Bloque duplicado
-            scanStatistics.duplicates++;
-            updateScanStatistics();
-            
-            if (source === 'live-camera') {
-                updateScanStatus(`Bloque ${index} ya fue escaneado`, 'info');
-            }
-        }
-    } catch (error) {
-        console.error('Error al procesar datos QR:', error, data);
-    }
-}
-
-// Mostrar información del archivo
-function displayFileInfo(metadata) {
-    fileInfoSection.style.display = 'block';
-    infoName.textContent = metadata.n;
-    infoType.textContent = metadata.t || 'Desconocido';
-    infoSize.textContent = metadata.s ? formatFileSize(metadata.s) : 'Desconocido';
-    infoHash.textContent = metadata.h || 'No disponible';
-    infoBlocks.textContent = `${metadata.tb - 1} bloques`;
-    
-    // Actualizar visualización de estado de bloques
-    updateBlockStatusDisplay();
-}
-
-// Formatear tamaño de archivo
-function formatFileSize(bytes) {
-    if (bytes === 0) return '0 Bytes';
-    const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-}
-
-// Actualizar visualización de estado de bloques
-function updateBlockStatusDisplay() {
-    if (!totalBlocks) return;
-    
-    blockStatusContainer.innerHTML = '';
-    const blocksToShow = Math.min(totalBlocks, 100); // Límite para no sobrecargar la UI
-    
-    for (let i = 0; i < blocksToShow; i++) {
-        const blockIndicator = document.createElement('div');
-        blockIndicator.className = 'block-indicator';
-        
-        if (i === 0) {
-            // Bloque de metadatos
-            blockIndicator.classList.add('received');
-            blockIndicator.title = 'Metadatos';
-        } else if (collectedBlocks.has(i)) {
-            blockIndicator.classList.add('received');
-            blockIndicator.title = `Bloque ${i} recibido`;
-        } else {
-            blockIndicator.classList.add('missing');
-            blockIndicator.title = `Bloque ${i} faltante`;
-        }
-        
-        blockStatusContainer.appendChild(blockIndicator);
-    }
-    
-    if (totalBlocks > 100) {
-        const moreIndicator = document.createElement('div');
-        moreIndicator.textContent = `+${totalBlocks - 100} más...`;
-        moreIndicator.style.marginLeft = '10px';
-        moreIndicator.style.fontSize = '0.8rem';
-        moreIndicator.style.color = 'var(--secondary-color)';
-        blockStatusContainer.appendChild(moreIndicator);
-    }
-}
-
-// Actualizar barra de progreso de reconstrucción
-function updateReconstructionProgress() {
-    if (totalBlocks <= 0) {
-        // Si no tenemos metadatos, mostramos el número de bloques recolectados
-        reconstructionProgressPercent.textContent = `${collectedBlocks.size} bloques`;
-        reconstructionProgressFill.style.width = '0%';
-        reconstructionProgressDetails.textContent = `Esperando metadatos...`;
-        return;
-    }
-    
-    const progress = Math.round((collectedBlocks.size / totalBlocks) * 100);
-    reconstructionProgressPercent.textContent = `${progress}%`;
-    reconstructionProgressFill.style.width = `${progress}%`;
-    reconstructionProgressDetails.textContent = `${collectedBlocks.size}/${totalBlocks} bloques escaneados`;
-    
-    // Cambiar color según el progreso
-    if (progress < 30) {
-        reconstructionProgressFill.style.background = 'var(--error-color)';
-    } else if (progress < 70) {
-        reconstructionProgressFill.style.background = 'var(--warning-color)';
-    } else {
-        reconstructionProgressFill.style.background = 'var(--success-color)';
-    }
-    
-    // Actualizar visualización de bloques
-    updateBlockStatusDisplay();
-}
-
-// Manejar clic en el botón de reconstruir
-function handleReconstructClick() {
-    if (collectedBlocks.size > 0) {
-        if (isFileEncrypted) {
-            openPasswordModal();
-        } else {
-            reconstructFile();
-        }
-    }
-}
-
-// Abrir modal de contraseña
-function openPasswordModal() {
-    passwordModal.style.display = 'flex';
-    passwordInput.focus();
-}
-
-// Cerrar modal de contraseña
-function closePasswordModal() {
-    passwordModal.style.display = 'none';
-    passwordInput.value = '';
-    filePassword = null;
-}
-
-// Abrir modal de detalles
-function openDetailsModal(content) {
-    fileDetailsContent.innerHTML = content;
-    fileDetailsModal.style.display = 'flex';
-}
-
-// Cerrar modal de detalles
-function closeDetailsModal() {
-    fileDetailsModal.style.display = 'none';
-}
-
-// Confirmar contraseña
-function confirmPassword() {
-    filePassword = passwordInput.value.trim();
-    if (!filePassword) {
-        showNotification('Por favor, introduce una contraseña', 'warning');
-        return;
-    }
-    closePasswordModal();
-    reconstructFile();
-}
-
-// Derivar clave con Argon2 - COMPATIBLE CON SHZ
-async function deriveKey(salt, password) {
-    try {
-        const key = await argon2.hash({
-            pass: password,
-            salt: salt,
-            type: argon2.ArgonType.Argon2id,
-            time: 2,
-            mem: 102400,
-            parallelism: navigator.hardwareConcurrency || 4,
-            hashLen: 32
-        });
-        return key.hash;
-    } catch (error) {
-        console.error('Error derivando clave:', error);
-        throw new Error('Error en derivación de clave');
-    }
-}
-
-// Descifrar datos - COMPATIBLE CON SHZ
-async function decryptData(encryptedData, password) {
-    try {
-        const salt = encryptedData.slice(0, SALT_SIZE);
-        const nonce = encryptedData.slice(SALT_SIZE, SALT_SIZE + NONCE_SIZE);
-        const ciphertext = encryptedData.slice(SALT_SIZE + NONCE_SIZE);
-        
-        const key = await deriveKey(salt, password);
-        
-        // AES-GCM
-        const algorithm = { name: 'AES-GCM', iv: nonce };
-        const cryptoKey = await crypto.subtle.importKey('raw', key, algorithm, false, ['decrypt']);
-        
-        const decrypted = await crypto.subtle.decrypt(algorithm, cryptoKey, ciphertext);
-        return new Uint8Array(decrypted);
-    } catch (error) {
-        console.error('Error descifrando datos:', error);
-        throw new Error('Error en descifrado - contraseña incorrecta');
-    }
-}
-
-// Aplicar corrección de errores Reed-Solomon - COMPATIBLE CON SHZ
-function applyReedSolomon(data) {
-    try {
-        // Crear codec con el mismo nivel de corrección que Python
-        const rs = new ReedSolomon(RS_RECOVERY);
-        return rs.decode(data);
-    } catch (error) {
-        console.error('Error en corrección Reed-Solomon:', error);
-        throw new Error('Error en corrección de errores');
-    }
-}
-
-// Descomprimir datos con pako (gzip) - COMPATIBLE CON SHZ
-function decompressData(data) {
-    try {
-        return pako.inflate(data);
-    } catch (error) {
-        console.error('Error descomprimiendo datos:', error);
-        throw new Error('Error en descompresión');
-    }
-}
-
-// Calcular hash BLAKE2b - COMPATIBLE CON SHZ
-async function calculateBlake2bHash(data) {
-    try {
-        // Usar la librería blake2b
-        const hash = blake2b(32); // 32 bytes = 256 bits
-        hash.update(new Uint8Array(data));
-        return Array.from(new Uint8Array(hash.digest()))
-            .map(b => b.toString(16).padStart(2, '0'))
-            .join('');
-    } catch (error) {
-        console.error('Error calculando hash:', error);
-        throw new Error('Error en cálculo de hash');
-    }
-}
-
-// Reconstruir archivo desde los bloques - COMPATIBLE CON SHZ
-async function reconstructFile() {
-    if (!metadata) {
-        showNotification('No hay metadatos. No se puede reconstruir el archivo.', 'error');
-        return;
-    }
-    
-    if (collectedBlocks.size < totalBlocks) {
-        const shouldForce = confirm(`Faltan ${totalBlocks - collectedBlocks.size} bloques. ¿Deseas intentar reconstruir igualmente?`);
-        if (!shouldForce) {
-            return;
-        }
-    }
-    
-    try {
-        showNotification('Reconstruyendo archivo...', 'info');
-        reconstructBtn.disabled = true;
-        
-        // Preparar datos para el Worker
-        const reconstructionData = {
-            blocks: Array.from(collectedBlocks.entries()),
-            metadata: metadata,
-            password: filePassword,
-            isEncrypted: isFileEncrypted
-        };
-        
-        // Enviar al Worker para procesamiento
-        if (processingWorker) {
-            const messageId = messageCounter++;
-            processingWorker.postMessage({
-                type: 'init',
-                data: {
-                    metadata: metadata,
-                    password: filePassword,
-                    isEncrypted: isFileEncrypted
-                },
-                id: messageId
-            });
-            
-            // Enviar bloques uno por uno
-            for (const [index, encodedData] of collectedBlocks.entries()) {
-                processingWorker.postMessage({
-                    type: 'process-block',
-                    data: { index, encodedData },
-                    id: messageId
+                }
+            } else if (format === 'web') {
+                // Procesar QR Web (existente)
+                callback({
+                    data: data,
+                    format: 'web',
+                    isNew: true
                 });
             }
             
-            // Finalizar
-            processingWorker.postMessage({
-                type: 'finalize',
-                id: messageId
+        } catch (error) {
+            console.error('Error procesando QR:', error);
+            callback({
+                data: data,
+                format: 'invalid',
+                error: error.message
             });
-        } else {
-            // Fallback si no hay Worker
-            const result = await reconstructInMainThread(reconstructionData);
-            handleReconstructionResult(result);
+        }
+    }
+    
+    updateStats() {
+        const now = Date.now();
+        this.stats.lastScanTimestamps.push(now);
+        
+        // Mantener solo últimos 10 segundos
+        const tenSecondsAgo = now - 10000;
+        this.stats.lastScanTimestamps = this.stats.lastScanTimestamps.filter(t => t > tenSecondsAgo);
+        
+        // Calcular velocidad (QR/seg)
+        if (this.stats.lastScanTimestamps.length > 1) {
+            const timeSpan = (this.stats.lastScanTimestamps[this.stats.lastScanTimestamps.length - 1] - 
+                           this.stats.lastScanTimestamps[0]) / 1000;
+            this.stats.scanSpeed = timeSpan > 0 ? 
+                (this.stats.lastScanTimestamps.length / timeSpan).toFixed(1) : 0;
+        }
+    }
+    
+    pause() {
+        if (this.scanInterval) {
+            clearInterval(this.scanInterval);
+            this.scanInterval = null;
+            this.scanning = false;
+        }
+    }
+    
+    resume() {
+        if (!this.scanning && this.stream) {
+            this.scanning = true;
+            // El intervalo se reinicia desde fuera
+        }
+    }
+    
+    stopCamera() {
+        this.pause();
+        
+        if (this.stream) {
+            this.stream.getTracks().forEach(track => track.stop());
+            this.stream = null;
         }
         
-    } catch (error) {
-        console.error('Error al reconstruir archivo:', error);
-        showNotification('Error al reconstruir el archivo: ' + error.message, 'error');
-        reconstructBtn.disabled = false;
+        this.scanning = false;
+        this.torchEnabled = false;
+    }
+    
+    getStats() {
+        return {
+            ...this.stats,
+            fps: this.fps.toFixed(1),
+            progress: this.compat.getProgress(),
+            totalBlocks: this.compat.totalBlocks,
+            receivedBlocks: this.compat.qrData.size,
+            format: this.compat.metadata ? 'python' : 'unknown'
+        };
+    }
+    
+    async saveProgress() {
+        const progress = {
+            timestamp: Date.now(),
+            metadata: this.compat.metadata,
+            qrData: Array.from(this.compat.qrData.entries()),
+            stats: this.getStats()
+        };
+        
+        localStorage.setItem('shumzu_scan_progress', JSON.stringify(progress));
+        return progress;
+    }
+    
+    async loadProgress() {
+        const saved = localStorage.getItem('shumzu_scan_progress');
+        if (saved) {
+            const progress = JSON.parse(saved);
+            
+            // Restaurar datos
+            this.compat.metadata = progress.metadata;
+            this.compat.qrData = new Map(progress.qrData);
+            this.compat.totalBlocks = progress.metadata?.b || 0;
+            this.compat.isEncrypted = progress.metadata?.e === 1;
+            this.compat.isCompressed = progress.metadata?.c === 1;
+            
+            // Restaurar cache
+            this.qrCache = new Set(progress.qrData.map(([_, data]) => data));
+            
+            return progress;
+        }
+        return null;
+    }
+    
+    reset() {
+        this.compat.reset();
+        this.qrCache.clear();
+        this.stats = {
+            totalScanned: 0,
+            uniqueBlocks: 0,
+            duplicates: 0,
+            scanSpeed: 0,
+            lastScanTimestamps: []
+        };
     }
 }
 
-// Reconstruir en el hilo principal (fallback) - COMPATIBLE CON SHZ
-async function reconstructInMainThread(data) {
-    const { blocks, metadata, password, isEncrypted } = data;
-    
-    // Ordenar bloques por índice
-    const sortedBlocks = blocks.sort((a, b) => a[0] - b[0]);
-    let compressedData = new Uint8Array(metadata.c); // metadata.c es el tamaño comprimido
-    
-    // Procesar cada bloque (excepto el 0 que son metadatos)
-    for (let i = 1; i < metadata.tb; i++) {
-        const block = sortedBlocks.find(b => b[0] === i);
-        if (block) {
-            let blockData = block[1];
+// Aplicación principal
+class SHUMZUApp {
+    constructor() {
+        this.scanner = new UltraScanner();
+        this.currentMode = 'scan';
+        this.reconstructionInProgress = false;
+        this.filePassword = null;
+        
+        // Elementos DOM
+        this.elements = {
+            cameraModal: document.getElementById('camera-modal'),
+            cameraStream: document.getElementById('camera-stream'),
+            scanOverlay: document.getElementById('scan-overlay'),
+            scanFeedback: document.getElementById('scan-feedback'),
+            totalScanned: document.getElementById('total-scanned'),
+            uniqueBlocks: document.getElementById('unique-blocks'),
+            scanSpeed: document.getElementById('scan-speed'),
+            scanResolution: document.getElementById('scan-resolution'),
             
-            // Decodificar base64
-            let encryptedData = base64ToBytes(blockData);
+            // Progreso
+            scanProgressContainer: document.getElementById('scan-progress-container'),
+            scanProgressPercent: document.getElementById('scan-progress-percent'),
+            scanProgressFill: document.getElementById('scan-progress-fill'),
+            scannedFrames: document.getElementById('scanned-frames'),
+            detectedQrs: document.getElementById('detected-qrs'),
+            scanFps: document.getElementById('scan-fps'),
             
-            // Descifrar si hay contraseña
-            let decryptedData;
-            if (isEncrypted && password) {
-                decryptedData = await decryptData(encryptedData, password);
-            } else {
-                decryptedData = encryptedData;
+            // Reconstrucción
+            reconProgressContainer: document.getElementById('reconstruction-progress-container'),
+            reconProgressFill: document.getElementById('reconstruction-progress-fill'),
+            blocksInfo: document.getElementById('blocks-info'),
+            dataSize: document.getElementById('data-size'),
+            blockGrid: document.getElementById('block-grid'),
+            compatibilityStatus: document.getElementById('compatibility-status'),
+            
+            // Información de archivo
+            fileInfo: document.getElementById('file-info'),
+            infoName: document.getElementById('info-name'),
+            infoSize: document.getElementById('info-size'),
+            infoBlocks: document.getElementById('info-blocks'),
+            infoEncryption: document.getElementById('info-encryption'),
+            infoDate: document.getElementById('info-date'),
+            infoHash: document.getElementById('info-hash'),
+            reconstructBtn: document.getElementById('reconstruct-btn'),
+            
+            // Modales
+            passwordModal: document.getElementById('password-modal'),
+            passwordInput: document.getElementById('password-input'),
+            metadataModal: document.getElementById('metadata-modal'),
+            metadataContent: document.getElementById('metadata-content')
+        };
+        
+        // Configuración
+        this.config = {
+            autoReconstruct: true,
+            ignoreDuplicates: true,
+            showFeedback: true,
+            saveProgress: true
+        };
+        
+        this.initialize();
+    }
+    
+    async initialize() {
+        // Cargar configuración
+        this.loadConfig();
+        
+        // Inicializar escáner
+        await this.scanner.initialize();
+        
+        // Cargar progreso anterior
+        const saved = await this.scanner.loadProgress();
+        if (saved) {
+            this.showNotification('Progreso anterior cargado', 'info');
+            this.updateUIFromProgress();
+        }
+        
+        // Configurar eventos
+        this.setupEventListeners();
+        
+        // Actualizar UI inicial
+        this.updateUI();
+        
+        console.log('SHUMZU+ App inicializada');
+    }
+    
+    setupEventListeners() {
+        // Modo
+        document.getElementById('mode-scan').addEventListener('click', () => this.switchMode('scan'));
+        document.getElementById('mode-generate').addEventListener('click', () => this.switchMode('generate'));
+        
+        // Cámara
+        document.getElementById('open-camera').addEventListener('click', () => this.openCamera());
+        document.getElementById('close-modal').addEventListener('click', () => this.closeCamera());
+        document.getElementById('switch-camera').addEventListener('click', () => this.switchCamera());
+        document.getElementById('toggle-torch').addEventListener('click', () => this.toggleTorch());
+        document.getElementById('pause-scan').addEventListener('click', () => this.pauseScan());
+        document.getElementById('resume-scan').addEventListener('click', () => this.resumeScan());
+        document.getElementById('save-scan').addEventListener('click', () => this.saveScanProgress());
+        
+        // Subida de archivos
+        document.getElementById('upload-files').addEventListener('click', () => {
+            document.getElementById('file-input').click();
+        });
+        document.getElementById('file-input').addEventListener('change', (e) => this.handleFileUpload(e));
+        
+        // Reconstrucción
+        document.getElementById('reconstruct-btn').addEventListener('click', () => this.startReconstruction());
+        document.getElementById('cancel-reconstruction').addEventListener('click', () => this.cancelReconstruction());
+        
+        // Contraseña
+        document.getElementById('confirm-password').addEventListener('click', () => this.confirmPassword());
+        document.getElementById('cancel-password').addEventListener('click', () => this.closePasswordModal());
+        document.getElementById('toggle-password').addEventListener('click', () => this.togglePasswordVisibility());
+        
+        // Metadatos
+        document.getElementById('show-metadata').addEventListener('click', () => this.showMetadata());
+        document.getElementById('close-metadata-modal').addEventListener('click', () => this.closeMetadataModal());
+        
+        // Configuración
+        document.getElementById('auto-reconstruct').addEventListener('change', (e) => {
+            this.config.autoReconstruct = e.target.checked;
+            this.saveConfig();
+        });
+        document.getElementById('ignore-duplicates').addEventListener('change', (e) => {
+            this.config.ignoreDuplicates = e.target.checked;
+            SCAN_CONFIG.IGNORE_DUPLICATES = e.target.checked;
+            this.saveConfig();
+        });
+        
+        // Tema
+        document.getElementById('theme-toggle').addEventListener('click', () => this.toggleTheme());
+        
+        // Teclas rápidas
+        document.addEventListener('keydown', (e) => this.handleKeydown(e));
+    }
+    
+    async openCamera() {
+        try {
+            this.elements.cameraModal.style.display = 'flex';
+            
+            // Iniciar cámara si no está activa
+            if (!this.scanner.stream) {
+                await this.scanner.startCamera();
             }
             
-            // Aplicar corrección Reed-Solomon
-            let correctedData = applyReedSolomon(decryptedData);
+            // Conectar stream al video
+            this.elements.cameraStream.srcObject = this.scanner.stream;
             
-            // Colocar en la posición correcta
-            let start = (i-1) * metadata.b; // metadata.b es el tamaño de bloque
-            let end = Math.min(start + correctedData.length, compressedData.length);
-            compressedData.set(new Uint8Array(correctedData).subarray(0, end - start), start);
-        } else {
-            // Rellenar con zeros si falta el bloque
-            let start = (i-1) * metadata.b;
-            let end = Math.min(start + metadata.b, metadata.c);
-            compressedData.fill(0, start, end);
+            // Iniciar escaneo
+            this.scanner.startScanning(this.elements.cameraStream, (result) => {
+                this.handleScanResult(result);
+            });
+            
+            // Actualizar UI de cámara
+            this.updateCameraUI();
+            
+        } catch (error) {
+            console.error('Error abriendo cámara:', error);
+            this.showNotification('Error al acceder a la cámara', 'error');
         }
     }
     
-    // Descomprimir
-    let decompressedData = decompressData(compressedData);
-    
-    // Verificar hash
-    let fileHash = await calculateBlake2bHash(decompressedData);
-    const hashMatches = fileHash === metadata.h;
-    
-    return {
-        decompressedData: decompressedData,
-        metadata: metadata,
-        hashMatches: hashMatches,
-        fileHash: fileHash
-    };
-}
-
-// Manejar mensajes del Worker
-function handleWorkerMessage(event) {
-    const { type, data, id } = event.data;
-    
-    if (type === 'progress') {
-        // Actualizar progreso
-        updateReconstructionProgress(data);
-    } else if (type === 'result') {
-        // Procesar resultado
-        handleReconstructionResult(data);
-        reconstructBtn.disabled = false;
-    } else if (type === 'error') {
-        // Manejar error
-        console.error('Error en Worker:', data);
-        showNotification('Error al reconstruir el archivo: ' + data, 'error');
-        reconstructBtn.disabled = false;
-    } else if (type === 'ack') {
-        // Confirmación de procesamiento
-        console.log('Mensaje procesado por worker:', id);
-    }
-}
-
-// Manejar resultado de la reconstrucción
-function handleReconstructionResult(result) {
-    const { decompressedData, metadata, hashMatches, fileHash, recoveredBlocks, totalBlocks } = result;
-    
-    // Verificar hash
-    if (!hashMatches) {
-        showNotification('Advertencia: El hash del archivo no coincide con el original. El archivo puede estar corrupto.', 'warning', 7000);
-    }
-    
-    // Crear y descargar archivo
-    const blob = new Blob([decompressedData], { type: metadata.t });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = metadata.n;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    
-    // Guardar en historial
-    saveToHistory(metadata.n, metadata.t, decompressedData.length, fileHash, totalBlocks, recoveredBlocks);
-    
-    showNotification(`Archivo reconstruido: ${metadata.n}`, 'success');
-    
-    // Reiniciar para nuevo escaneo
-    resetScanner();
-}
-
-// Utilidad: Base64 a bytes
-function base64ToBytes(base64) {
-    const binaryString = atob(base64);
-    const bytes = new Uint8Array(binaryString.length);
-    for (let i = 0; i < binaryString.length; i++) {
-        bytes[i] = binaryString.charCodeAt(i);
-    }
-    return bytes;
-}
-
-// Guardar en historial
-function saveToHistory(name, type, size, hash, totalBlocks, recoveredBlocks) {
-    const history = getHistory();
-    const newItem = {
-        id: Date.now(),
-        name,
-        type,
-        size,
-        hash,
-        totalBlocks,
-        recoveredBlocks,
-        date: new Date().toISOString()
-    };
-    
-    history.unshift(newItem);
-    // Mantener solo los últimos elementos
-    if (history.length > MAX_HISTORY_ITEMS) {
-        history.splice(MAX_HISTORY_ITEMS);
-    }
-    
-    localStorage.setItem('shumzuHistory', JSON.stringify(history));
-    loadHistory();
-}
-
-// Obtener historial desde localStorage
-function getHistory() {
-    const historyJSON = localStorage.getItem('shumzuHistory');
-    return historyJSON ? JSON.parse(historyJSON) : [];
-}
-
-// Cargar historial en la UI
-function loadHistory() {
-    const history = getHistory();
-    historyList.innerHTML = '';
-    
-    if (history.length === 0) {
-        historyList.innerHTML = '<p class="no-history">No hay archivos reconstruidos recientemente</p>';
-        return;
-    }
-    
-    history.forEach(item => {
-        const historyItem = document.createElement('div');
-        historyItem.className = 'history-item';
+    handleScanResult(result) {
+        // Actualizar estadísticas
+        const stats = this.scanner.getStats();
+        this.elements.totalScanned.textContent = stats.totalScanned;
+        this.elements.uniqueBlocks.textContent = stats.uniqueBlocks;
+        this.elements.scanSpeed.textContent = stats.scanSpeed;
         
-        historyItem.innerHTML = `
-            <div class="history-info">
-                <div class="history-name">${item.name}</div>
-                <div class="history-details">
-                    ${formatFileSize(item.size)} • ${new Date(item.date).toLocaleDateString()} • ${item.recoveredBlocks || item.blocks}/${item.totalBlocks || item.blocks} bloques
-                </div>
-            </div>
-            <button class="download-btn" data-id="${item.id}">Ver detalles</button>
-        `;
+        // Mostrar feedback visual
+        if (result.isNew) {
+            this.showScanFeedback('✓ QR detectado', 'success');
+            
+            // Actualizar progreso
+            this.updateScanProgress(stats.progress);
+            
+            // Mostrar información si hay metadatos
+            if (result.metadata) {
+                this.displayFileInfo(result.metadata);
+            }
+            
+            // Reconstruir automáticamente si está configurado
+            if (this.config.autoReconstruct && stats.progress >= 100) {
+                this.startReconstruction();
+            }
+        } else if (result.isDuplicate) {
+            this.showScanFeedback('⚠️ QR duplicado', 'warning');
+        }
         
-        historyList.appendChild(historyItem);
-    });
+        // Actualizar UI
+        this.updateUI();
+    }
     
-    // Agregar event listeners a los botones de detalles
-    document.querySelectorAll('.download-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            const id = parseInt(e.target.getAttribute('data-id'));
-            showHistoryItemDetails(id);
+    updateScanProgress(progress) {
+        this.elements.scanProgressContainer.style.display = 'block';
+        this.elements.scanProgressPercent.textContent = `${progress}%`;
+        this.elements.scanProgressFill.style.width = `${progress}%`;
+        
+        const stats = this.scanner.getStats();
+        this.elements.scannedFrames.textContent = stats.frameCount || 0;
+        this.elements.detectedQrs.textContent = stats.totalScanned;
+        this.elements.scanFps.textContent = stats.fps;
+    }
+    
+    displayFileInfo(metadata) {
+        this.elements.fileInfo.style.display = 'block';
+        
+        this.elements.infoName.textContent = metadata.n || 'Desconocido';
+        this.elements.infoSize.textContent = this.formatSize(metadata.s || 0);
+        this.elements.infoBlocks.textContent = `${metadata.b || 0} bloques`;
+        this.elements.infoEncryption.textContent = metadata.e === 1 ? '🔒 Cifrado' : '🔓 No cifrado';
+        this.elements.infoDate.textContent = metadata.t ? 
+            new Date(metadata.t * 1000).toLocaleDateString() : 'Desconocido';
+        this.elements.infoHash.textContent = metadata.h ? metadata.h.substring(0, 32) + '...' : 'No disponible';
+        
+        // Mostrar botón de reconstruir si tenemos bloques
+        if (this.scanner.compat.qrData.size > 0) {
+            this.elements.reconstructBtn.style.display = 'block';
+        }
+        
+        // Actualizar estado de compatibilidad
+        this.elements.compatibilityStatus.textContent = 'SHUMZU Python';
+        this.elements.compatibilityStatus.className = 'stat-value compatible';
+    }
+    
+    async startReconstruction() {
+        if (this.reconstructionInProgress) return;
+        
+        try {
+            this.reconstructionInProgress = true;
+            this.elements.reconProgressContainer.style.display = 'block';
+            
+            // Verificar si necesita contraseña
+            if (this.scanner.compat.isEncrypted) {
+                this.openPasswordModal();
+                return;
+            }
+            
+            // Iniciar reconstrucción
+            await this.reconstructFile();
+            
+        } catch (error) {
+            console.error('Error iniciando reconstrucción:', error);
+            this.showNotification(`Error: ${error.message}`, 'error');
+            this.reconstructionInProgress = false;
+        }
+    }
+    
+    async reconstructFile(password = '') {
+        try {
+            this.showNotification('Reconstruyendo archivo...', 'info');
+            
+            // Actualizar UI
+            this.updateReconstructionUI(0, 'Preparando...');
+            
+            // Reconstruir archivo
+            const result = await this.scanner.compat.reconstructFile(password);
+            
+            // Actualizar UI durante reconstrucción
+            this.updateReconstructionUI(50, 'Procesando datos...');
+            
+            if (result.hashMatches) {
+                this.showNotification('✅ Archivo reconstruido exitosamente', 'success');
+                
+                // Crear y descargar archivo
+                const blob = new Blob([result.data]);
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = result.metadata.n;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                
+                // Guardar en historial
+                this.saveToHistory(result);
+                
+                // Actualizar UI final
+                this.updateReconstructionUI(100, 'Completado');
+                setTimeout(() => {
+                    this.elements.reconProgressContainer.style.display = 'none';
+                }, 2000);
+                
+            } else {
+                this.showNotification('⚠️ Hash no coincide - archivo puede estar corrupto', 'warning');
+            }
+            
+        } catch (error) {
+            console.error('Error reconstruyendo archivo:', error);
+            this.showNotification(`Error: ${error.message}`, 'error');
+        } finally {
+            this.reconstructionInProgress = false;
+        }
+    }
+    
+    updateReconstructionUI(progress, status) {
+        this.elements.reconProgressFill.style.width = `${progress}%`;
+        
+        const stats = this.scanner.getStats();
+        this.elements.blocksInfo.textContent = 
+            `${stats.receivedBlocks}/${stats.totalBlocks} bloques`;
+        
+        if (this.scanner.compat.metadata) {
+            this.elements.dataSize.textContent = 
+                this.formatSize(this.scanner.compat.metadata.s);
+        }
+        
+        // Actualizar grid de bloques
+        this.updateBlockGrid();
+    }
+    
+    updateBlockGrid() {
+        const grid = this.elements.blockGrid;
+        grid.innerHTML = '';
+        
+        const total = this.scanner.compat.totalBlocks;
+        const received = this.scanner.compat.qrData.size;
+        
+        // Crear indicadores de bloque
+        for (let i = 1; i <= total; i++) {
+            const block = document.createElement('div');
+            block.className = 'block-indicator';
+            block.title = `Bloque ${i}`;
+            
+            if (this.scanner.compat.qrData.has(i)) {
+                block.classList.add('received');
+                block.textContent = i;
+            } else {
+                block.classList.add('missing');
+                block.textContent = '?';
+            }
+            
+            grid.appendChild(block);
+        }
+    }
+    
+    async handleFileUpload(event) {
+        const files = Array.from(event.target.files);
+        if (!files.length) return;
+        
+        this.showNotification(`Procesando ${files.length} archivo(s)...`, 'info');
+        
+        for (const file of files) {
+            await this.processUploadedFile(file);
+        }
+        
+        this.showNotification('Archivos procesados', 'success');
+    }
+    
+    async processUploadedFile(file) {
+        return new Promise((resolve) => {
+            const reader = new FileReader();
+            
+            reader.onload = async (e) => {
+                try {
+                    if (file.type.startsWith('image/')) {
+                        await this.processImageFile(e.target.result, file.name);
+                    } else if (file.type.startsWith('video/') || file.name.endsWith('.gif')) {
+                        await this.processVideoFile(e.target.result, file.name);
+                    }
+                } catch (error) {
+                    console.error(`Error procesando ${file.name}:`, error);
+                }
+                resolve();
+            };
+            
+            reader.onerror = () => {
+                console.error(`Error leyendo ${file.name}`);
+                resolve();
+            };
+            
+            if (file.type.startsWith('video/') || file.name.endsWith('.gif')) {
+                reader.readAsArrayBuffer(file);
+            } else {
+                reader.readAsDataURL(file);
+            }
         });
-    });
-}
-
-// Mostrar detalles de un elemento del historial
-function showHistoryItemDetails(id) {
-    const history = getHistory();
-    const item = history.find(i => i.id === id);
+    }
     
-    if (!item) return;
+    async processImageFile(dataUrl, filename) {
+        const img = new Image();
+        img.src = dataUrl;
+        
+        await new Promise((resolve) => {
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                canvas.width = img.width;
+                canvas.height = img.height;
+                ctx.drawImage(img, 0, 0);
+                
+                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                const code = jsQR(imageData.data, imageData.width, imageData.height);
+                
+                if (code) {
+                    this.handleScanResult({
+                        data: code.data,
+                        isNew: true,
+                        format: detectSHUMZUFormat(code.data)
+                    });
+                }
+                
+                resolve();
+            };
+        });
+    }
     
-    const content = `
-        <div class="info-grid">
-            <div class="info-item">
-                <label>Nombre:</label>
-                <span>${item.name}</span>
-            </div>
-            <div class="info-item">
-                <label>Tipo:</label>
-                <span>${item.type}</span>
-            </div>
-            <div class="info-item">
-                <label>Tamaño:</label>
-                <span>${formatFileSize(item.size)}</span>
-            </div>
-            <div class="info-item">
-                <label>Hash (BLAKE2b):</label>
-                <span class="hash-value">${item.hash}</span>
-            </div>
-            <div class="info-item">
-                <label>Bloques recuperados:</label>
-                <span>${item.recoveredBlocks || item.blocks}/${item.totalBlocks || item.blocks}</span>
-            </div>
-            <div class="info-item">
-                <label>Fecha:</label>
-                <span>${new Date(item.date).toLocaleString()}</span>
-            </div>
-        </div>
-        <div class="modal-actions">
-            <button class="btn-primary" onclick="navigator.clipboard.writeText('${item.hash}').then(() => showNotification('Hash copiado al portapapeles', 'success'))">Copiar hash</button>
-        </div>
-    `;
+    // Métodos auxiliares
+    formatSize(bytes) {
+        const units = ['B', 'KB', 'MB', 'GB'];
+        let size = bytes;
+        let unitIndex = 0;
+        
+        while (size >= 1024 && unitIndex < units.length - 1) {
+            size /= 1024;
+            unitIndex++;
+        }
+        
+        return `${size.toFixed(2)} ${units[unitIndex]}`;
+    }
     
-    openDetailsModal(content);
-}
-
-// Limpiar historial
-function clearHistory() {
-    if (confirm('¿Estás seguro de que quieres borrar todo el historial?')) {
-        localStorage.removeItem('shumzuHistory');
-        loadHistory();
-        showNotification('Historial borrado', 'info');
+    showNotification(message, type = 'info', duration = 3000) {
+        // Implementación de notificación (similar a versión anterior)
+        console.log(`[${type.toUpperCase()}] ${message}`);
+    }
+    
+    showScanFeedback(message, type) {
+        const feedback = this.elements.scanFeedback;
+        feedback.textContent = message;
+        feedback.className = `scan-feedback ${type}`;
+        feedback.style.display = 'block';
+        
+        setTimeout(() => {
+            feedback.style.display = 'none';
+        }, 1000);
+    }
+    
+    // Gestión de modales
+    openPasswordModal() {
+        this.elements.passwordModal.style.display = 'flex';
+        this.elements.passwordInput.focus();
+    }
+    
+    closePasswordModal() {
+        this.elements.passwordModal.style.display = 'none';
+        this.elements.passwordInput.value = '';
+    }
+    
+    async confirmPassword() {
+        const password = this.elements.passwordInput.value;
+        if (!password) {
+            this.showNotification('Ingresa una contraseña', 'warning');
+            return;
+        }
+        
+        this.closePasswordModal();
+        await this.reconstructFile(password);
+    }
+    
+    togglePasswordVisibility() {
+        const input = this.elements.passwordInput;
+        input.type = input.type === 'password' ? 'text' : 'password';
+    }
+    
+    showMetadata() {
+        if (!this.scanner.compat.metadata) return;
+        
+        const metadata = this.scanner.compat.metadata;
+        let content = '<div class="metadata-grid">';
+        
+        for (const [key, value] of Object.entries(metadata)) {
+            content += `
+                <div class="metadata-item">
+                    <strong>${key}:</strong>
+                    <span>${typeof value === 'object' ? JSON.stringify(value) : value}</span>
+                </div>
+            `;
+        }
+        
+        content += '</div>';
+        this.elements.metadataContent.innerHTML = content;
+        this.elements.metadataModal.style.display = 'flex';
+    }
+    
+    closeMetadataModal() {
+        this.elements.metadataModal.style.display = 'none';
+    }
+    
+    // Control de cámara
+    async switchCamera() {
+        const newMode = await this.scanner.switchCamera();
+        this.elements.cameraStream.srcObject = this.scanner.stream;
+        this.showNotification(`Cámara cambiada a ${newMode === 'environment' ? 'trasera' : 'frontal'}`, 'info');
+    }
+    
+    async toggleTorch() {
+        const enabled = await this.scanner.toggleTorch();
+        this.showNotification(`Linterna ${enabled ? 'activada' : 'desactivada'}`, 'info');
+    }
+    
+    pauseScan() {
+        this.scanner.pause();
+        document.getElementById('pause-scan').style.display = 'none';
+        document.getElementById('resume-scan').style.display = 'inline-block';
+        this.showNotification('Escaneo pausado', 'info');
+    }
+    
+    resumeScan() {
+        this.scanner.resume();
+        document.getElementById('pause-scan').style.display = 'inline-block';
+        document.getElementById('resume-scan').style.display = 'none';
+        this.showNotification('Escaneo reanudado', 'info');
+    }
+    
+    async saveScanProgress() {
+        await this.scanner.saveProgress();
+        this.showNotification('Progreso guardado', 'success');
+    }
+    
+    // Modos de la aplicación
+    switchMode(mode) {
+        this.currentMode = mode;
+        
+        // Actualizar botones de modo
+        document.querySelectorAll('.mode-btn').forEach(btn => btn.classList.remove('active'));
+        document.getElementById(`mode-${mode}`).classList.add('active');
+        
+        // Mostrar/ocultar secciones
+        document.querySelectorAll('.active-section').forEach(section => {
+            section.classList.remove('active-section');
+        });
+        document.getElementById(`${mode}-section`).classList.add('active-section');
+    }
+    
+    // Configuración
+    loadConfig() {
+        const saved = localStorage.getItem('shumzu_config');
+        if (saved) {
+            this.config = { ...this.config, ...JSON.parse(saved) };
+        }
+        
+        // Aplicar a UI
+        document.getElementById('auto-reconstruct').checked = this.config.autoReconstruct;
+        document.getElementById('ignore-duplicates').checked = this.config.ignoreDuplicates;
+    }
+    
+    saveConfig() {
+        localStorage.setItem('shumzu_config', JSON.stringify(this.config));
+    }
+    
+    // Tema
+    toggleTheme() {
+        const current = document.body.getAttribute('data-theme') || 'light';
+        const newTheme = current === 'light' ? 'dark' : 'light';
+        document.body.setAttribute('data-theme', newTheme);
+        localStorage.setItem('shumzu_theme', newTheme);
+        
+        const toggle = document.getElementById('theme-toggle');
+        toggle.textContent = newTheme === 'light' ? '🌙' : '☀️';
+    }
+    
+    // Teclas rápidas
+    handleKeydown(e) {
+        if (e.key === 'Escape') {
+            this.closeCamera();
+            this.closePasswordModal();
+            this.closeMetadataModal();
+        }
+        
+        if (e.key === 'Enter' && this.elements.passwordModal.style.display === 'flex') {
+            this.confirmPassword();
+        }
+        
+        // Atajos de cámara
+        if (e.key === ' ' && this.scanner.scanning) {
+            e.preventDefault();
+            this.pauseScan();
+        }
+        
+        if (e.key === 's' && e.ctrlKey) {
+            e.preventDefault();
+            this.saveScanProgress();
+        }
+    }
+    
+    closeCamera() {
+        this.scanner.stopCamera();
+        this.elements.cameraModal.style.display = 'none';
+    }
+    
+    cancelReconstruction() {
+        this.reconstructionInProgress = false;
+        this.elements.reconProgressContainer.style.display = 'none';
+        this.showNotification('Reconstrucción cancelada', 'info');
+    }
+    
+    updateUI() {
+        // Actualizar estadísticas en tiempo real
+        const stats = this.scanner.getStats();
+        
+        if (stats.totalBlocks > 0) {
+            const progress = Math.round((stats.receivedBlocks / stats.totalBlocks) * 100);
+            this.elements.scanProgressPercent.textContent = `${progress}%`;
+            this.elements.scanProgressFill.style.width = `${progress}%`;
+        }
+    }
+    
+    updateUIFromProgress() {
+        const stats = this.scanner.getStats();
+        
+        if (this.scanner.compat.metadata) {
+            this.displayFileInfo(this.scanner.compat.metadata);
+        }
+        
+        if (stats.receivedBlocks > 0) {
+            this.updateScanProgress(stats.progress);
+            this.updateBlockGrid();
+        }
+    }
+    
+    saveToHistory(result) {
+        // Implementación similar a versión anterior
+        console.log('Guardando en historial:', result);
     }
 }
 
-// Mostrar notificación
-function showNotification(message, type = 'info', duration = 5000) {
-    // Eliminar notificación anterior si existe
-    const existingNotification = document.getElementById('shumzu-notification');
-    if (existingNotification) {
-        existingNotification.remove();
-    }
+// Inicializar aplicación cuando se cargue la página
+document.addEventListener('DOMContentLoaded', () => {
+    // Cargar tema
+    const savedTheme = localStorage.getItem('shumzu_theme') || 'light';
+    document.body.setAttribute('data-theme', savedTheme);
     
-    // Crear nueva notificación
-    const notification = document.createElement('div');
-    notification.id = 'shumzu-notification';
-    notification.className = `notification ${type}`;
-    
-    // Icono según el tipo
-    let icon = 'ℹ️';
-    if (type === 'error') icon = '❌';
-    if (type === 'success') icon = '✅';
-    if (type === 'warning') icon = '⚠️';
-    
-    notification.innerHTML = `
-        <span class="notification-icon">${icon}</span>
-        <span class="notification-message">${message}</span>
-    `;
-    
-    document.body.appendChild(notification);
-    
-    // Auto-eliminar después del tiempo especificado
-    setTimeout(() => {
-        if (notification.parentNode) {
-            notification.style.opacity = '0';
-            setTimeout(() => notification.remove(), 300);
-        }
-    }, duration);
-}
-
-// Actualizar estado de escaneo
-function updateScanStatus(message, type) {
-    scanStatus.textContent = message;
-    scanStatus.className = 'scan-status';
-    if (type) {
-        scanStatus.classList.add(type);
-    }
-}
-
-// Reiniciar escáner
-function resetScanner() {
-    collectedBlocks.clear();
-    totalBlocks = 0;
-    metadata = null;
-    filePassword = null;
-    isFileEncrypted = false;
-    reconstructionProgressContainer.style.display = 'none';
-    fileInfoSection.style.display = 'none';
-    encryptedInfo.style.display = 'none';
-    reconstructBtn.style.display = 'none';
-    reconstructBtn.disabled = false;
-    scanStatistics = {
-        totalScanned: 0,
-        uniqueScanned: 0,
-        duplicates: 0,
-        lastScanTime: 0
-    };
-    updateScanStatistics();
-    console.log('Escáner reiniciado, listo para nuevo escaneo');
-}
-
-// Inicializar cuando se carga la página
-window.addEventListener('load', async () => {
-    try {
-        // Verificar que las librerías estén cargadas
-        if (typeof jsQR === 'undefined') {
-            throw new Error('No se pudo cargar jsQR');
-        }
-        
-        if (typeof pako === 'undefined') {
-            throw new Error('No se pudo cargar pako (compresión)');
-        }
-        
-        if (typeof argon2 === 'undefined') {
-            throw new Error('No se pudo cargar Argon2');
-        }
-        
-        if (typeof ReedSolomon === 'undefined') {
-            throw new Error('No se pudo cargar ReedSolomon');
-        }
-        
-        console.log('SHUMZU Web App inicializada correctamente');
-        showNotification('SHUMZU está listo para escanear códigos QR', 'success', 3000);
-    } catch (error) {
-        console.error('Error al inicializar SHUMZU:', error);
-        showNotification('Error al cargar las dependencias necesarias', 'error');
-    }
+    // Inicializar app
+    window.SHUMZU_APP = new SHUMZUApp();
 });
