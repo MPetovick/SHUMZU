@@ -1,9 +1,9 @@
-// script.js - Versión mejorada con escaneo ultrarrápido
+// script.js - Versión mejorada y corregida
 const SCAN_CONFIG = {
-    FPS_TARGET: 5,          // 5 FPS para balance entre velocidad y CPU
-    SCAN_INTERVAL: 200,     // 200ms entre escaneos
-    MAX_FRAME_SKIP: 2,      // Máximo frames a saltar
-    DETECTION_THRESHOLD: 0.7, // Umbral de confianza
+    FPS_TARGET: 5,
+    SCAN_INTERVAL: 200,
+    MAX_FRAME_SKIP: 2,
+    DETECTION_THRESHOLD: 0.7,
     AUTO_RECONSTRUCT: true,
     IGNORE_DUPLICATES: true,
     RESOLUTION: { width: 1280, height: 720 }
@@ -24,7 +24,6 @@ class UltraScanner {
         this.currentCamera = 'environment';
         this.torchEnabled = false;
         
-        // Estadísticas en tiempo real
         this.stats = {
             totalScanned: 0,
             uniqueBlocks: 0,
@@ -33,21 +32,14 @@ class UltraScanner {
             lastScanTimestamps: []
         };
         
-        // Cache para QR detectados
         this.qrCache = new Set();
-        
-        // Compatibilidad con Python
         this.compat = new SHUMZUCompat();
     }
     
     async initialize() {
         try {
-            // Obtener lista de cámaras
             const devices = await navigator.mediaDevices.enumerateDevices();
             this.cameras = devices.filter(device => device.kind === 'videoinput');
-            
-            // Iniciar con cámara trasera por defecto
-            await this.startCamera('environment');
             return true;
         } catch (error) {
             console.error('Error inicializando escáner:', error);
@@ -115,16 +107,13 @@ class UltraScanner {
         this.lastScanTime = Date.now();
         this.stats.lastScanTimestamps = [];
         
-        // Configurar canvas
         this.canvas.width = SCAN_CONFIG.RESOLUTION.width;
         this.canvas.height = SCAN_CONFIG.RESOLUTION.height;
         
-        // Iniciar bucle de escaneo
         this.scanInterval = setInterval(() => {
             this.processFrame(videoElement, callback);
         }, SCAN_CONFIG.SCAN_INTERVAL);
         
-        // Actualizar FPS cada segundo
         setInterval(() => {
             const now = Date.now();
             const elapsed = (now - this.lastScanTime) / 1000;
@@ -140,14 +129,10 @@ class UltraScanner {
         }
         
         try {
-            // Dibujar frame en canvas
             this.ctx.drawImage(video, 0, 0, this.canvas.width, this.canvas.height);
             this.frameCount++;
             
-            // Obtener datos de imagen
             const imageData = this.ctx.getImageData(0, 0, this.canvas.width, this.canvas.height);
-            
-            // Escanear QR
             const code = jsQR(imageData.data, imageData.width, imageData.height, {
                 inversionAttempts: 'dontInvert',
             });
@@ -156,9 +141,7 @@ class UltraScanner {
                 this.handleQRCode(code.data, callback);
             }
             
-            // Actualizar estadísticas
             this.updateStats();
-            
         } catch (error) {
             console.error('Error procesando frame:', error);
         }
@@ -168,11 +151,9 @@ class UltraScanner {
         this.stats.totalScanned++;
         
         try {
-            // Detectar formato
             const format = detectSHUMZUFormat(data);
             
             if (format === 'python') {
-                // Procesar QR de Python
                 const result = this.compat.decodePythonQR(data);
                 
                 if (result) {
@@ -202,14 +183,12 @@ class UltraScanner {
                     }
                 }
             } else if (format === 'web') {
-                // Procesar QR Web (existente)
                 callback({
                     data: data,
                     format: 'web',
                     isNew: true
                 });
             }
-            
         } catch (error) {
             console.error('Error procesando QR:', error);
             callback({
@@ -224,11 +203,9 @@ class UltraScanner {
         const now = Date.now();
         this.stats.lastScanTimestamps.push(now);
         
-        // Mantener solo últimos 10 segundos
         const tenSecondsAgo = now - 10000;
         this.stats.lastScanTimestamps = this.stats.lastScanTimestamps.filter(t => t > tenSecondsAgo);
         
-        // Calcular velocidad (QR/seg)
         if (this.stats.lastScanTimestamps.length > 1) {
             const timeSpan = (this.stats.lastScanTimestamps[this.stats.lastScanTimestamps.length - 1] - 
                            this.stats.lastScanTimestamps[0]) / 1000;
@@ -248,7 +225,6 @@ class UltraScanner {
     resume() {
         if (!this.scanning && this.stream) {
             this.scanning = true;
-            // El intervalo se reinicia desde fuera
         }
     }
     
@@ -292,14 +268,12 @@ class UltraScanner {
         if (saved) {
             const progress = JSON.parse(saved);
             
-            // Restaurar datos
             this.compat.metadata = progress.metadata;
             this.compat.qrData = new Map(progress.qrData);
             this.compat.totalBlocks = progress.metadata?.b || 0;
             this.compat.isEncrypted = progress.metadata?.e === 1;
             this.compat.isCompressed = progress.metadata?.c === 1;
             
-            // Restaurar cache
             this.qrCache = new Set(progress.qrData.map(([_, data]) => data));
             
             return progress;
@@ -320,7 +294,6 @@ class UltraScanner {
     }
 }
 
-// Aplicación principal
 class SHUMZUApp {
     constructor() {
         this.scanner = new UltraScanner();
@@ -328,7 +301,6 @@ class SHUMZUApp {
         this.reconstructionInProgress = false;
         this.filePassword = null;
         
-        // Elementos DOM
         this.elements = {
             cameraModal: document.getElementById('camera-modal'),
             cameraStream: document.getElementById('camera-stream'),
@@ -339,7 +311,6 @@ class SHUMZUApp {
             scanSpeed: document.getElementById('scan-speed'),
             scanResolution: document.getElementById('scan-resolution'),
             
-            // Progreso
             scanProgressContainer: document.getElementById('scan-progress-container'),
             scanProgressPercent: document.getElementById('scan-progress-percent'),
             scanProgressFill: document.getElementById('scan-progress-fill'),
@@ -347,7 +318,6 @@ class SHUMZUApp {
             detectedQrs: document.getElementById('detected-qrs'),
             scanFps: document.getElementById('scan-fps'),
             
-            // Reconstrucción
             reconProgressContainer: document.getElementById('reconstruction-progress-container'),
             reconProgressFill: document.getElementById('reconstruction-progress-fill'),
             blocksInfo: document.getElementById('blocks-info'),
@@ -355,7 +325,6 @@ class SHUMZUApp {
             blockGrid: document.getElementById('block-grid'),
             compatibilityStatus: document.getElementById('compatibility-status'),
             
-            // Información de archivo
             fileInfo: document.getElementById('file-info'),
             infoName: document.getElementById('info-name'),
             infoSize: document.getElementById('info-size'),
@@ -365,14 +334,12 @@ class SHUMZUApp {
             infoHash: document.getElementById('info-hash'),
             reconstructBtn: document.getElementById('reconstruct-btn'),
             
-            // Modales
             passwordModal: document.getElementById('password-modal'),
             passwordInput: document.getElementById('password-input'),
             metadataModal: document.getElementById('metadata-modal'),
             metadataContent: document.getElementById('metadata-content')
         };
         
-        // Configuración
         this.config = {
             autoReconstruct: true,
             ignoreDuplicates: true,
@@ -384,34 +351,25 @@ class SHUMZUApp {
     }
     
     async initialize() {
-        // Cargar configuración
         this.loadConfig();
-        
-        // Inicializar escáner
         await this.scanner.initialize();
         
-        // Cargar progreso anterior
         const saved = await this.scanner.loadProgress();
         if (saved) {
             this.showNotification('Progreso anterior cargado', 'info');
             this.updateUIFromProgress();
         }
         
-        // Configurar eventos
         this.setupEventListeners();
-        
-        // Actualizar UI inicial
         this.updateUI();
         
         console.log('SHUMZU+ App inicializada');
     }
     
     setupEventListeners() {
-        // Modo
         document.getElementById('mode-scan').addEventListener('click', () => this.switchMode('scan'));
         document.getElementById('mode-generate').addEventListener('click', () => this.switchMode('generate'));
         
-        // Cámara
         document.getElementById('open-camera').addEventListener('click', () => this.openCamera());
         document.getElementById('close-modal').addEventListener('click', () => this.closeCamera());
         document.getElementById('switch-camera').addEventListener('click', () => this.switchCamera());
@@ -420,26 +378,21 @@ class SHUMZUApp {
         document.getElementById('resume-scan').addEventListener('click', () => this.resumeScan());
         document.getElementById('save-scan').addEventListener('click', () => this.saveScanProgress());
         
-        // Subida de archivos
         document.getElementById('upload-files').addEventListener('click', () => {
             document.getElementById('file-input').click();
         });
         document.getElementById('file-input').addEventListener('change', (e) => this.handleFileUpload(e));
         
-        // Reconstrucción
         document.getElementById('reconstruct-btn').addEventListener('click', () => this.startReconstruction());
         document.getElementById('cancel-reconstruction').addEventListener('click', () => this.cancelReconstruction());
         
-        // Contraseña
         document.getElementById('confirm-password').addEventListener('click', () => this.confirmPassword());
         document.getElementById('cancel-password').addEventListener('click', () => this.closePasswordModal());
         document.getElementById('toggle-password').addEventListener('click', () => this.togglePasswordVisibility());
         
-        // Metadatos
         document.getElementById('show-metadata').addEventListener('click', () => this.showMetadata());
         document.getElementById('close-metadata-modal').addEventListener('click', () => this.closeMetadataModal());
         
-        // Configuración
         document.getElementById('auto-reconstruct').addEventListener('change', (e) => {
             this.config.autoReconstruct = e.target.checked;
             this.saveConfig();
@@ -450,10 +403,8 @@ class SHUMZUApp {
             this.saveConfig();
         });
         
-        // Tema
         document.getElementById('theme-toggle').addEventListener('click', () => this.toggleTheme());
         
-        // Teclas rápidas
         document.addEventListener('keydown', (e) => this.handleKeydown(e));
     }
     
@@ -461,22 +412,17 @@ class SHUMZUApp {
         try {
             this.elements.cameraModal.style.display = 'flex';
             
-            // Iniciar cámara si no está activa
             if (!this.scanner.stream) {
                 await this.scanner.startCamera();
             }
             
-            // Conectar stream al video
             this.elements.cameraStream.srcObject = this.scanner.stream;
             
-            // Iniciar escaneo
             this.scanner.startScanning(this.elements.cameraStream, (result) => {
                 this.handleScanResult(result);
             });
             
-            // Actualizar UI de cámara
             this.updateCameraUI();
-            
         } catch (error) {
             console.error('Error abriendo cámara:', error);
             this.showNotification('Error al acceder a la cámara', 'error');
@@ -484,25 +430,19 @@ class SHUMZUApp {
     }
     
     handleScanResult(result) {
-        // Actualizar estadísticas
         const stats = this.scanner.getStats();
         this.elements.totalScanned.textContent = stats.totalScanned;
         this.elements.uniqueBlocks.textContent = stats.uniqueBlocks;
         this.elements.scanSpeed.textContent = stats.scanSpeed;
         
-        // Mostrar feedback visual
         if (result.isNew) {
             this.showScanFeedback('✓ QR detectado', 'success');
-            
-            // Actualizar progreso
             this.updateScanProgress(stats.progress);
             
-            // Mostrar información si hay metadatos
             if (result.metadata) {
                 this.displayFileInfo(result.metadata);
             }
             
-            // Reconstruir automáticamente si está configurado
             if (this.config.autoReconstruct && stats.progress >= 100) {
                 this.startReconstruction();
             }
@@ -510,7 +450,6 @@ class SHUMZUApp {
             this.showScanFeedback('⚠️ QR duplicado', 'warning');
         }
         
-        // Actualizar UI
         this.updateUI();
     }
     
@@ -536,12 +475,10 @@ class SHUMZUApp {
             new Date(metadata.t * 1000).toLocaleDateString() : 'Desconocido';
         this.elements.infoHash.textContent = metadata.h ? metadata.h.substring(0, 32) + '...' : 'No disponible';
         
-        // Mostrar botón de reconstruir si tenemos bloques
         if (this.scanner.compat.qrData.size > 0) {
             this.elements.reconstructBtn.style.display = 'block';
         }
         
-        // Actualizar estado de compatibilidad
         this.elements.compatibilityStatus.textContent = 'SHUMZU Python';
         this.elements.compatibilityStatus.className = 'stat-value compatible';
     }
@@ -553,15 +490,12 @@ class SHUMZUApp {
             this.reconstructionInProgress = true;
             this.elements.reconProgressContainer.style.display = 'block';
             
-            // Verificar si necesita contraseña
             if (this.scanner.compat.isEncrypted) {
                 this.openPasswordModal();
                 return;
             }
             
-            // Iniciar reconstrucción
             await this.reconstructFile();
-            
         } catch (error) {
             console.error('Error iniciando reconstrucción:', error);
             this.showNotification(`Error: ${error.message}`, 'error');
@@ -572,20 +506,14 @@ class SHUMZUApp {
     async reconstructFile(password = '') {
         try {
             this.showNotification('Reconstruyendo archivo...', 'info');
-            
-            // Actualizar UI
             this.updateReconstructionUI(0, 'Preparando...');
             
-            // Reconstruir archivo
             const result = await this.scanner.compat.reconstructFile(password);
-            
-            // Actualizar UI durante reconstrucción
             this.updateReconstructionUI(50, 'Procesando datos...');
             
             if (result.hashMatches) {
                 this.showNotification('✅ Archivo reconstruido exitosamente', 'success');
                 
-                // Crear y descargar archivo
                 const blob = new Blob([result.data]);
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
@@ -596,19 +524,15 @@ class SHUMZUApp {
                 document.body.removeChild(a);
                 URL.revokeObjectURL(url);
                 
-                // Guardar en historial
                 this.saveToHistory(result);
-                
-                // Actualizar UI final
                 this.updateReconstructionUI(100, 'Completado');
+                
                 setTimeout(() => {
                     this.elements.reconProgressContainer.style.display = 'none';
                 }, 2000);
-                
             } else {
                 this.showNotification('⚠️ Hash no coincide - archivo puede estar corrupto', 'warning');
             }
-            
         } catch (error) {
             console.error('Error reconstruyendo archivo:', error);
             this.showNotification(`Error: ${error.message}`, 'error');
@@ -629,7 +553,6 @@ class SHUMZUApp {
                 this.formatSize(this.scanner.compat.metadata.s);
         }
         
-        // Actualizar grid de bloques
         this.updateBlockGrid();
     }
     
@@ -640,7 +563,6 @@ class SHUMZUApp {
         const total = this.scanner.compat.totalBlocks;
         const received = this.scanner.compat.qrData.size;
         
-        // Crear indicadores de bloque
         for (let i = 1; i <= total; i++) {
             const block = document.createElement('div');
             block.className = 'block-indicator';
@@ -729,7 +651,6 @@ class SHUMZUApp {
         });
     }
     
-    // Métodos auxiliares
     formatSize(bytes) {
         const units = ['B', 'KB', 'MB', 'GB'];
         let size = bytes;
@@ -744,8 +665,16 @@ class SHUMZUApp {
     }
     
     showNotification(message, type = 'info', duration = 3000) {
-        // Implementación de notificación (similar a versión anterior)
-        console.log(`[${type.toUpperCase()}] ${message}`);
+        const notification = document.createElement('div');
+        notification.className = `notification ${type}`;
+        notification.innerHTML = `
+            <span>${message}</span>
+        `;
+        document.body.appendChild(notification);
+        
+        setTimeout(() => {
+            notification.remove();
+        }, duration);
     }
     
     showScanFeedback(message, type) {
@@ -759,7 +688,6 @@ class SHUMZUApp {
         }, 1000);
     }
     
-    // Gestión de modales
     openPasswordModal() {
         this.elements.passwordModal.style.display = 'flex';
         this.elements.passwordInput.focus();
@@ -810,7 +738,6 @@ class SHUMZUApp {
         this.elements.metadataModal.style.display = 'none';
     }
     
-    // Control de cámara
     async switchCamera() {
         const newMode = await this.scanner.switchCamera();
         this.elements.cameraStream.srcObject = this.scanner.stream;
@@ -841,29 +768,24 @@ class SHUMZUApp {
         this.showNotification('Progreso guardado', 'success');
     }
     
-    // Modos de la aplicación
     switchMode(mode) {
         this.currentMode = mode;
         
-        // Actualizar botones de modo
         document.querySelectorAll('.mode-btn').forEach(btn => btn.classList.remove('active'));
         document.getElementById(`mode-${mode}`).classList.add('active');
         
-        // Mostrar/ocultar secciones
         document.querySelectorAll('.active-section').forEach(section => {
             section.classList.remove('active-section');
         });
         document.getElementById(`${mode}-section`).classList.add('active-section');
     }
     
-    // Configuración
     loadConfig() {
         const saved = localStorage.getItem('shumzu_config');
         if (saved) {
             this.config = { ...this.config, ...JSON.parse(saved) };
         }
         
-        // Aplicar a UI
         document.getElementById('auto-reconstruct').checked = this.config.autoReconstruct;
         document.getElementById('ignore-duplicates').checked = this.config.ignoreDuplicates;
     }
@@ -872,7 +794,6 @@ class SHUMZUApp {
         localStorage.setItem('shumzu_config', JSON.stringify(this.config));
     }
     
-    // Tema
     toggleTheme() {
         const current = document.body.getAttribute('data-theme') || 'light';
         const newTheme = current === 'light' ? 'dark' : 'light';
@@ -883,7 +804,6 @@ class SHUMZUApp {
         toggle.textContent = newTheme === 'light' ? '🌙' : '☀️';
     }
     
-    // Teclas rápidas
     handleKeydown(e) {
         if (e.key === 'Escape') {
             this.closeCamera();
@@ -895,7 +815,6 @@ class SHUMZUApp {
             this.confirmPassword();
         }
         
-        // Atajos de cámara
         if (e.key === ' ' && this.scanner.scanning) {
             e.preventDefault();
             this.pauseScan();
@@ -919,7 +838,6 @@ class SHUMZUApp {
     }
     
     updateUI() {
-        // Actualizar estadísticas en tiempo real
         const stats = this.scanner.getStats();
         
         if (stats.totalBlocks > 0) {
@@ -943,17 +861,14 @@ class SHUMZUApp {
     }
     
     saveToHistory(result) {
-        // Implementación similar a versión anterior
+        // Implementar guardado en historial
         console.log('Guardando en historial:', result);
     }
 }
 
-// Inicializar aplicación cuando se cargue la página
 document.addEventListener('DOMContentLoaded', () => {
-    // Cargar tema
     const savedTheme = localStorage.getItem('shumzu_theme') || 'light';
     document.body.setAttribute('data-theme', savedTheme);
     
-    // Inicializar app
     window.SHUMZU_APP = new SHUMZUApp();
 });

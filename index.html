@@ -9,10 +9,10 @@
     <link rel="stylesheet" href="styles.css">
     <link rel="icon" type="image/png" href="./rsc/logo_SHUMZU.png">
     
+    <!-- Scripts de terceros -->
     <script src="https://cdn.jsdelivr.net/npm/jsQR@1.4.0/dist/jsQR.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/pako@2.1.0/dist/pako.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/crypto-js@4.2.0/crypto-js.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
 </head>
 <body>
     <div class="container">
@@ -230,7 +230,7 @@
         <div class="modal-content">
             <button id="close-modal" class="close-btn">&times;</button>
             <h2>Escanear QR en Tiempo Real</h2>
-            <p class="scan-help">Apunta la cámara a los códigos QR. La detección es automática.</p>
+            <p class="scan-help">Apunte la cámara a los códigos QR. La detección es automática.</p>
             
             <div class="camera-container">
                 <div class="camera-controls">
@@ -277,12 +277,12 @@
         <div class="modal-content">
             <button id="close-password-modal" class="close-btn">&times;</button>
             <h2>Archivo Cifrado</h2>
-            <p>Este archivo fue cifrado con shumzuX.py. Introduce la contraseña para continuar.</p>
+            <p>Este archivo fue cifrado con shumzuX.py. Introduzca la contraseña para continuar.</p>
             <div class="password-input-group">
                 <input type="password" id="password-input" placeholder="Contraseña usada en Python" autocomplete="current-password">
                 <button id="toggle-password" class="btn-eye">👁️</button>
             </div>
-            <p class="password-hint">Nota: Usa la misma contraseña que usaste con shumzuX.py</p>
+            <p class="password-hint">Nota: Use la misma contraseña que usó con shumzuX.py</p>
             <div class="modal-buttons">
                 <button id="confirm-password" class="btn-primary">Descifrar</button>
                 <button id="cancel-password" class="btn-secondary">Cancelar</button>
@@ -299,7 +299,7 @@
         </div>
     </div>
 
-    <!-- Scripts -->
+    <!-- Scripts propios -->
     <script src="reed-solomon.js"></script>
     <script src="shumzu-compat.js"></script>
     <script src="script.js"></script>
