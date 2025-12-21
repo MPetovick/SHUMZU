@@ -1,654 +1,59 @@
-// script.js - Versión mejorada y corregida
-const SCAN_CONFIG = {
-    FPS_TARGET: 5,
-    SCAN_INTERVAL: 200,
-    MAX_FRAME_SKIP: 2,
-    DETECTION_THRESHOLD: 0.7,
-    AUTO_RECONSTRUCT: true,
-    IGNORE_DUPLICATES: true,
-    RESOLUTION: { width: 1280, height: 720 }
-};
-
-class UltraScanner {
-    constructor() {
-        this.stream = null;
-        this.canvas = document.createElement('canvas');
-        this.ctx = this.canvas.getContext('2d');
-        this.scanning = false;
-        this.lastScanTime = 0;
-        this.frameCount = 0;
-        this.qrCount = 0;
-        this.fps = 0;
-        this.scanInterval = null;
-        this.cameras = [];
-        this.currentCamera = 'environment';
-        this.torchEnabled = false;
-        
-        this.stats = {
-            totalScanned: 0,
-            uniqueBlocks: 0,
-            duplicates: 0,
-            scanSpeed: 0,
-            lastScanTimestamps: []
-        };
-        
-        this.qrCache = new Set();
-        this.compat = new SHUMZUCompat();
-    }
-    
-    async initialize() {
-        try {
-            const devices = await navigator.mediaDevices.enumerateDevices();
-            this.cameras = devices.filter(device => device.kind === 'videoinput');
-            return true;
-        } catch (error) {
-            console.error('Error inicializando escáner:', error);
-            return false;
-        }
-    }
-    
-    async startCamera(facingMode = 'environment') {
-        try {
-            if (this.stream) {
-                this.stopCamera();
-            }
-            
-            const constraints = {
-                video: {
-                    facingMode: facingMode,
-                    width: { ideal: SCAN_CONFIG.RESOLUTION.width },
-                    height: { ideal: SCAN_CONFIG.RESOLUTION.height },
-                    frameRate: { ideal: 30 }
-                },
-                audio: false
-            };
-            
-            this.stream = await navigator.mediaDevices.getUserMedia(constraints);
-            this.currentCamera = facingMode;
-            return this.stream;
-        } catch (error) {
-            console.error('Error accediendo a la cámara:', error);
-            throw error;
-        }
-    }
-    
-    async switchCamera() {
-        try {
-            const newMode = this.currentCamera === 'environment' ? 'user' : 'environment';
-            await this.startCamera(newMode);
-            return newMode;
-        } catch (error) {
-            console.error('Error cambiando cámara:', error);
-            return this.currentCamera;
-        }
-    }
-    
-    async toggleTorch() {
-        try {
-            const track = this.stream?.getVideoTracks()[0];
-            if (track && 'applyConstraints' in track) {
-                this.torchEnabled = !this.torchEnabled;
-                await track.applyConstraints({
-                    advanced: [{ torch: this.torchEnabled }]
-                });
-            }
-            return this.torchEnabled;
-        } catch (error) {
-            console.warn('Linterna no soportada:', error);
-            return false;
-        }
-    }
-    
-    startScanning(videoElement, callback) {
-        if (!this.stream || this.scanning) return;
-        
-        this.scanning = true;
-        this.frameCount = 0;
-        this.lastScanTime = Date.now();
-        this.stats.lastScanTimestamps = [];
-        
-        this.canvas.width = SCAN_CONFIG.RESOLUTION.width;
-        this.canvas.height = SCAN_CONFIG.RESOLUTION.height;
-        
-        this.scanInterval = setInterval(() => {
-            this.processFrame(videoElement, callback);
-        }, SCAN_CONFIG.SCAN_INTERVAL);
-        
-        setInterval(() => {
-            const now = Date.now();
-            const elapsed = (now - this.lastScanTime) / 1000;
-            this.fps = elapsed > 0 ? this.frameCount / elapsed : 0;
-            this.frameCount = 0;
-            this.lastScanTime = now;
-        }, 1000);
-    }
-    
-    processFrame(video, callback) {
-        if (!video || video.readyState !== video.HAVE_ENOUGH_DATA) {
-            return;
-        }
-        
-        try {
-            this.ctx.drawImage(video, 0, 0, this.canvas.width, this.canvas.height);
-            this.frameCount++;
-            
-            const imageData = this.ctx.getImageData(0, 0, this.canvas.width, this.canvas.height);
-            const code = jsQR(imageData.data, imageData.width, imageData.height, {
-                inversionAttempts: 'dontInvert',
-            });
-            
-            if (code) {
-                this.handleQRCode(code.data, callback);
-            }
-            
-            this.updateStats();
-        } catch (error) {
-            console.error('Error procesando frame:', error);
-        }
-    }
-    
-    handleQRCode(data, callback) {
-        this.stats.totalScanned++;
-        
-        try {
-            const format = detectSHUMZUFormat(data);
-            
-            if (format === 'python') {
-                const result = this.compat.decodePythonQR(data);
-                
-                if (result) {
-                    const isNew = !this.qrCache.has(data);
-                    
-                    if (isNew || !SCAN_CONFIG.IGNORE_DUPLICATES) {
-                        this.stats.uniqueBlocks = this.compat.qrData.size;
-                        
-                        if (isNew) {
-                            this.qrCache.add(data);
-                            callback({
-                                data: data,
-                                format: 'python',
-                                isNew: true,
-                                metadata: result.metadata,
-                                progress: this.compat.getProgress()
-                            });
-                        } else {
-                            this.stats.duplicates++;
-                            callback({
-                                data: data,
-                                format: 'python',
-                                isNew: false,
-                                isDuplicate: true
-                            });
-                        }
-                    }
-                }
-            } else if (format === 'web') {
-                callback({
-                    data: data,
-                    format: 'web',
-                    isNew: true
-                });
-            }
-        } catch (error) {
-            console.error('Error procesando QR:', error);
-            callback({
-                data: data,
-                format: 'invalid',
-                error: error.message
-            });
-        }
-    }
-    
-    updateStats() {
-        const now = Date.now();
-        this.stats.lastScanTimestamps.push(now);
-        
-        const tenSecondsAgo = now - 10000;
-        this.stats.lastScanTimestamps = this.stats.lastScanTimestamps.filter(t => t > tenSecondsAgo);
-        
-        if (this.stats.lastScanTimestamps.length > 1) {
-            const timeSpan = (this.stats.lastScanTimestamps[this.stats.lastScanTimestamps.length - 1] - 
-                           this.stats.lastScanTimestamps[0]) / 1000;
-            this.stats.scanSpeed = timeSpan > 0 ? 
-                (this.stats.lastScanTimestamps.length / timeSpan).toFixed(1) : 0;
-        }
-    }
-    
-    pause() {
-        if (this.scanInterval) {
-            clearInterval(this.scanInterval);
-            this.scanInterval = null;
-            this.scanning = false;
-        }
-    }
-    
-    resume() {
-        if (!this.scanning && this.stream) {
-            this.scanning = true;
-        }
-    }
-    
-    stopCamera() {
-        this.pause();
-        
-        if (this.stream) {
-            this.stream.getTracks().forEach(track => track.stop());
-            this.stream = null;
-        }
-        
-        this.scanning = false;
-        this.torchEnabled = false;
-    }
-    
-    getStats() {
-        return {
-            ...this.stats,
-            fps: this.fps.toFixed(1),
-            progress: this.compat.getProgress(),
-            totalBlocks: this.compat.totalBlocks,
-            receivedBlocks: this.compat.qrData.size,
-            format: this.compat.metadata ? 'python' : 'unknown'
-        };
-    }
-    
-    async saveProgress() {
-        const progress = {
-            timestamp: Date.now(),
-            metadata: this.compat.metadata,
-            qrData: Array.from(this.compat.qrData.entries()),
-            stats: this.getStats()
-        };
-        
-        localStorage.setItem('shumzu_scan_progress', JSON.stringify(progress));
-        return progress;
-    }
-    
-    async loadProgress() {
-        const saved = localStorage.getItem('shumzu_scan_progress');
-        if (saved) {
-            const progress = JSON.parse(saved);
-            
-            this.compat.metadata = progress.metadata;
-            this.compat.qrData = new Map(progress.qrData);
-            this.compat.totalBlocks = progress.metadata?.b || 0;
-            this.compat.isEncrypted = progress.metadata?.e === 1;
-            this.compat.isCompressed = progress.metadata?.c === 1;
-            
-            this.qrCache = new Set(progress.qrData.map(([_, data]) => data));
-            
-            return progress;
-        }
-        return null;
-    }
-    
-    reset() {
-        this.compat.reset();
-        this.qrCache.clear();
-        this.stats = {
-            totalScanned: 0,
-            uniqueBlocks: 0,
-            duplicates: 0,
-            scanSpeed: 0,
-            lastScanTimestamps: []
-        };
-    }
-}
-
+// script.js - Versión optimizada y refactorizada
 class SHUMZUApp {
     constructor() {
-        this.scanner = new UltraScanner();
-        this.currentMode = 'scan';
-        this.reconstructionInProgress = false;
-        this.filePassword = null;
-        
-        this.elements = {
-            cameraModal: document.getElementById('camera-modal'),
-            cameraStream: document.getElementById('camera-stream'),
-            scanOverlay: document.getElementById('scan-overlay'),
-            scanFeedback: document.getElementById('scan-feedback'),
-            totalScanned: document.getElementById('total-scanned'),
-            uniqueBlocks: document.getElementById('unique-blocks'),
-            scanSpeed: document.getElementById('scan-speed'),
-            scanResolution: document.getElementById('scan-resolution'),
-            
-            scanProgressContainer: document.getElementById('scan-progress-container'),
-            scanProgressPercent: document.getElementById('scan-progress-percent'),
-            scanProgressFill: document.getElementById('scan-progress-fill'),
-            scannedFrames: document.getElementById('scanned-frames'),
-            detectedQrs: document.getElementById('detected-qrs'),
-            scanFps: document.getElementById('scan-fps'),
-            
-            reconProgressContainer: document.getElementById('reconstruction-progress-container'),
-            reconProgressFill: document.getElementById('reconstruction-progress-fill'),
-            blocksInfo: document.getElementById('blocks-info'),
-            dataSize: document.getElementById('data-size'),
-            blockGrid: document.getElementById('block-grid'),
-            compatibilityStatus: document.getElementById('compatibility-status'),
-            
-            fileInfo: document.getElementById('file-info'),
-            infoName: document.getElementById('info-name'),
-            infoSize: document.getElementById('info-size'),
-            infoBlocks: document.getElementById('info-blocks'),
-            infoEncryption: document.getElementById('info-encryption'),
-            infoDate: document.getElementById('info-date'),
-            infoHash: document.getElementById('info-hash'),
-            reconstructBtn: document.getElementById('reconstruct-btn'),
-            
-            passwordModal: document.getElementById('password-modal'),
-            passwordInput: document.getElementById('password-input'),
-            metadataModal: document.getElementById('metadata-modal'),
-            metadataContent: document.getElementById('metadata-content')
-        };
-        
         this.config = {
             autoReconstruct: true,
             ignoreDuplicates: true,
-            showFeedback: true,
-            saveProgress: true
+            maxFileSize: 50 * 1024 * 1024, // 50MB
+            cameraFPS: 5,
+            scanResolution: { width: 640, height: 480 }
         };
+        
+        this.state = {
+            currentMode: 'scan',
+            scanning: false,
+            reconstructing: false,
+            generating: false,
+            selectedFile: null,
+            qrCodes: [],
+            scanProgress: 0,
+            generationProgress: 0
+        };
+        
+        this.scanner = new QRScanner(this);
+        this.generator = new QRGenerator(this);
+        this.ui = new UIManager(this);
         
         this.initialize();
     }
     
     async initialize() {
-        this.loadConfig();
+        this.ui.setupEventListeners();
         await this.scanner.initialize();
+        this.loadSavedSettings();
+        this.ui.updateTheme();
         
-        const saved = await this.scanner.loadProgress();
+        console.log('SHUMZU+ inicializado');
+    }
+    
+    loadSavedSettings() {
+        const saved = localStorage.getItem('shumzu_config');
         if (saved) {
-            this.showNotification('Progreso anterior cargado', 'info');
-            this.updateUIFromProgress();
-        }
-        
-        this.setupEventListeners();
-        this.updateUI();
-        
-        console.log('SHUMZU+ App inicializada');
-    }
-    
-    setupEventListeners() {
-        document.getElementById('mode-scan').addEventListener('click', () => this.switchMode('scan'));
-        document.getElementById('mode-generate').addEventListener('click', () => this.switchMode('generate'));
-        
-        document.getElementById('open-camera').addEventListener('click', () => this.openCamera());
-        document.getElementById('close-modal').addEventListener('click', () => this.closeCamera());
-        document.getElementById('switch-camera').addEventListener('click', () => this.switchCamera());
-        document.getElementById('toggle-torch').addEventListener('click', () => this.toggleTorch());
-        document.getElementById('pause-scan').addEventListener('click', () => this.pauseScan());
-        document.getElementById('resume-scan').addEventListener('click', () => this.resumeScan());
-        document.getElementById('save-scan').addEventListener('click', () => this.saveScanProgress());
-        
-        document.getElementById('upload-files').addEventListener('click', () => {
-            document.getElementById('file-input').click();
-        });
-        document.getElementById('file-input').addEventListener('change', (e) => this.handleFileUpload(e));
-        
-        document.getElementById('reconstruct-btn').addEventListener('click', () => this.startReconstruction());
-        document.getElementById('cancel-reconstruction').addEventListener('click', () => this.cancelReconstruction());
-        
-        document.getElementById('confirm-password').addEventListener('click', () => this.confirmPassword());
-        document.getElementById('cancel-password').addEventListener('click', () => this.closePasswordModal());
-        document.getElementById('toggle-password').addEventListener('click', () => this.togglePasswordVisibility());
-        
-        document.getElementById('show-metadata').addEventListener('click', () => this.showMetadata());
-        document.getElementById('close-metadata-modal').addEventListener('click', () => this.closeMetadataModal());
-        
-        document.getElementById('auto-reconstruct').addEventListener('change', (e) => {
-            this.config.autoReconstruct = e.target.checked;
-            this.saveConfig();
-        });
-        document.getElementById('ignore-duplicates').addEventListener('change', (e) => {
-            this.config.ignoreDuplicates = e.target.checked;
-            SCAN_CONFIG.IGNORE_DUPLICATES = e.target.checked;
-            this.saveConfig();
-        });
-        
-        document.getElementById('theme-toggle').addEventListener('click', () => this.toggleTheme());
-        
-        document.addEventListener('keydown', (e) => this.handleKeydown(e));
-    }
-    
-    async openCamera() {
-        try {
-            this.elements.cameraModal.style.display = 'flex';
-            
-            if (!this.scanner.stream) {
-                await this.scanner.startCamera();
-            }
-            
-            this.elements.cameraStream.srcObject = this.scanner.stream;
-            
-            this.scanner.startScanning(this.elements.cameraStream, (result) => {
-                this.handleScanResult(result);
-            });
-            
-            this.updateCameraUI();
-        } catch (error) {
-            console.error('Error abriendo cámara:', error);
-            this.showNotification('Error al acceder a la cámara', 'error');
+            this.config = { ...this.config, ...JSON.parse(saved) };
         }
     }
     
-    handleScanResult(result) {
-        const stats = this.scanner.getStats();
-        this.elements.totalScanned.textContent = stats.totalScanned;
-        this.elements.uniqueBlocks.textContent = stats.uniqueBlocks;
-        this.elements.scanSpeed.textContent = stats.scanSpeed;
-        
-        if (result.isNew) {
-            this.showScanFeedback('✓ QR detectado', 'success');
-            this.updateScanProgress(stats.progress);
-            
-            if (result.metadata) {
-                this.displayFileInfo(result.metadata);
-            }
-            
-            if (this.config.autoReconstruct && stats.progress >= 100) {
-                this.startReconstruction();
-            }
-        } else if (result.isDuplicate) {
-            this.showScanFeedback('⚠️ QR duplicado', 'warning');
-        }
-        
-        this.updateUI();
+    saveSettings() {
+        localStorage.setItem('shumzu_config', JSON.stringify(this.config));
     }
     
-    updateScanProgress(progress) {
-        this.elements.scanProgressContainer.style.display = 'block';
-        this.elements.scanProgressPercent.textContent = `${progress}%`;
-        this.elements.scanProgressFill.style.width = `${progress}%`;
-        
-        const stats = this.scanner.getStats();
-        this.elements.scannedFrames.textContent = stats.frameCount || 0;
-        this.elements.detectedQrs.textContent = stats.totalScanned;
-        this.elements.scanFps.textContent = stats.fps;
+    switchMode(mode) {
+        this.state.currentMode = mode;
+        this.ui.updateMode(mode);
     }
     
-    displayFileInfo(metadata) {
-        this.elements.fileInfo.style.display = 'block';
-        
-        this.elements.infoName.textContent = metadata.n || 'Desconocido';
-        this.elements.infoSize.textContent = this.formatSize(metadata.s || 0);
-        this.elements.infoBlocks.textContent = `${metadata.b || 0} bloques`;
-        this.elements.infoEncryption.textContent = metadata.e === 1 ? '🔒 Cifrado' : '🔓 No cifrado';
-        this.elements.infoDate.textContent = metadata.t ? 
-            new Date(metadata.t * 1000).toLocaleDateString() : 'Desconocido';
-        this.elements.infoHash.textContent = metadata.h ? metadata.h.substring(0, 32) + '...' : 'No disponible';
-        
-        if (this.scanner.compat.qrData.size > 0) {
-            this.elements.reconstructBtn.style.display = 'block';
-        }
-        
-        this.elements.compatibilityStatus.textContent = 'SHUMZU Python';
-        this.elements.compatibilityStatus.className = 'stat-value compatible';
-    }
-    
-    async startReconstruction() {
-        if (this.reconstructionInProgress) return;
-        
-        try {
-            this.reconstructionInProgress = true;
-            this.elements.reconProgressContainer.style.display = 'block';
-            
-            if (this.scanner.compat.isEncrypted) {
-                this.openPasswordModal();
-                return;
-            }
-            
-            await this.reconstructFile();
-        } catch (error) {
-            console.error('Error iniciando reconstrucción:', error);
-            this.showNotification(`Error: ${error.message}`, 'error');
-            this.reconstructionInProgress = false;
-        }
-    }
-    
-    async reconstructFile(password = '') {
-        try {
-            this.showNotification('Reconstruyendo archivo...', 'info');
-            this.updateReconstructionUI(0, 'Preparando...');
-            
-            const result = await this.scanner.compat.reconstructFile(password);
-            this.updateReconstructionUI(50, 'Procesando datos...');
-            
-            if (result.hashMatches) {
-                this.showNotification('✅ Archivo reconstruido exitosamente', 'success');
-                
-                const blob = new Blob([result.data]);
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = result.metadata.n;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                URL.revokeObjectURL(url);
-                
-                this.saveToHistory(result);
-                this.updateReconstructionUI(100, 'Completado');
-                
-                setTimeout(() => {
-                    this.elements.reconProgressContainer.style.display = 'none';
-                }, 2000);
-            } else {
-                this.showNotification('⚠️ Hash no coincide - archivo puede estar corrupto', 'warning');
-            }
-        } catch (error) {
-            console.error('Error reconstruyendo archivo:', error);
-            this.showNotification(`Error: ${error.message}`, 'error');
-        } finally {
-            this.reconstructionInProgress = false;
-        }
-    }
-    
-    updateReconstructionUI(progress, status) {
-        this.elements.reconProgressFill.style.width = `${progress}%`;
-        
-        const stats = this.scanner.getStats();
-        this.elements.blocksInfo.textContent = 
-            `${stats.receivedBlocks}/${stats.totalBlocks} bloques`;
-        
-        if (this.scanner.compat.metadata) {
-            this.elements.dataSize.textContent = 
-                this.formatSize(this.scanner.compat.metadata.s);
-        }
-        
-        this.updateBlockGrid();
-    }
-    
-    updateBlockGrid() {
-        const grid = this.elements.blockGrid;
-        grid.innerHTML = '';
-        
-        const total = this.scanner.compat.totalBlocks;
-        const received = this.scanner.compat.qrData.size;
-        
-        for (let i = 1; i <= total; i++) {
-            const block = document.createElement('div');
-            block.className = 'block-indicator';
-            block.title = `Bloque ${i}`;
-            
-            if (this.scanner.compat.qrData.has(i)) {
-                block.classList.add('received');
-                block.textContent = i;
-            } else {
-                block.classList.add('missing');
-                block.textContent = '?';
-            }
-            
-            grid.appendChild(block);
-        }
-    }
-    
-    async handleFileUpload(event) {
-        const files = Array.from(event.target.files);
-        if (!files.length) return;
-        
-        this.showNotification(`Procesando ${files.length} archivo(s)...`, 'info');
-        
-        for (const file of files) {
-            await this.processUploadedFile(file);
-        }
-        
-        this.showNotification('Archivos procesados', 'success');
-    }
-    
-    async processUploadedFile(file) {
-        return new Promise((resolve) => {
-            const reader = new FileReader();
-            
-            reader.onload = async (e) => {
-                try {
-                    if (file.type.startsWith('image/')) {
-                        await this.processImageFile(e.target.result, file.name);
-                    } else if (file.type.startsWith('video/') || file.name.endsWith('.gif')) {
-                        await this.processVideoFile(e.target.result, file.name);
-                    }
-                } catch (error) {
-                    console.error(`Error procesando ${file.name}:`, error);
-                }
-                resolve();
-            };
-            
-            reader.onerror = () => {
-                console.error(`Error leyendo ${file.name}`);
-                resolve();
-            };
-            
-            if (file.type.startsWith('video/') || file.name.endsWith('.gif')) {
-                reader.readAsArrayBuffer(file);
-            } else {
-                reader.readAsDataURL(file);
-            }
-        });
-    }
-    
-    async processImageFile(dataUrl, filename) {
-        const img = new Image();
-        img.src = dataUrl;
-        
-        await new Promise((resolve) => {
-            img.onload = () => {
-                const canvas = document.createElement('canvas');
-                const ctx = canvas.getContext('2d');
-                canvas.width = img.width;
-                canvas.height = img.height;
-                ctx.drawImage(img, 0, 0);
-                
-                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-                const code = jsQR(imageData.data, imageData.width, imageData.height);
-                
-                if (code) {
-                    this.handleScanResult({
-                        data: code.data,
-                        isNew: true,
-                        format: detectSHUMZUFormat(code.data)
-                    });
-                }
-                
-                resolve();
-            };
-        });
+    showNotification(message, type = 'info', duration = 3000) {
+        this.ui.showNotification(message, type, duration);
     }
     
     formatSize(bytes) {
@@ -661,20 +66,691 @@ class SHUMZUApp {
             unitIndex++;
         }
         
-        return `${size.toFixed(2)} ${units[unitIndex]}`;
+        return `${size.toFixed(1)} ${units[unitIndex]}`;
+    }
+}
+
+class QRScanner {
+    constructor(app) {
+        this.app = app;
+        this.stream = null;
+        this.canvas = document.createElement('canvas');
+        this.ctx = this.canvas.getContext('2d');
+        this.scanning = false;
+        this.lastFrameTime = 0;
+        this.frameCount = 0;
+        this.fps = 0;
+        this.animationFrame = null;
+        this.qrCache = new Set();
+        this.compat = new SHUMZUCompat();
+        
+        // Configurar canvas con la resolución deseada
+        this.canvas.width = this.app.config.scanResolution.width;
+        this.canvas.height = this.app.config.scanResolution.height;
     }
     
-    showNotification(message, type = 'info', duration = 3000) {
-        const notification = document.createElement('div');
-        notification.className = `notification ${type}`;
-        notification.innerHTML = `
-            <span>${message}</span>
-        `;
-        document.body.appendChild(notification);
+    async initialize() {
+        try {
+            const devices = await navigator.mediaDevices.enumerateDevices();
+            this.cameras = devices.filter(d => d.kind === 'videoinput');
+            return true;
+        } catch (error) {
+            console.error('Error inicializando escáner:', error);
+            return false;
+        }
+    }
+    
+    async startCamera(facingMode = 'environment') {
+        try {
+            if (this.stream) this.stopCamera();
+            
+            const constraints = {
+                video: {
+                    facingMode: facingMode,
+                    width: { ideal: this.app.config.scanResolution.width },
+                    height: { ideal: this.app.config.scanResolution.height },
+                    frameRate: { ideal: this.app.config.cameraFPS * 2 }
+                },
+                audio: false
+            };
+            
+            this.stream = await navigator.mediaDevices.getUserMedia(constraints);
+            
+            // Mostrar modal de cámara
+            this.app.ui.showCameraModal();
+            
+            const videoElement = document.getElementById('camera-stream');
+            videoElement.srcObject = this.stream;
+            
+            return this.stream;
+        } catch (error) {
+            this.app.showNotification('Error accediendo a la cámara', 'error');
+            throw error;
+        }
+    }
+    
+    startScanning(videoElement) {
+        if (!this.stream || this.scanning) return;
         
-        setTimeout(() => {
-            notification.remove();
-        }, duration);
+        this.scanning = true;
+        this.frameCount = 0;
+        this.lastFrameTime = performance.now();
+        
+        const processFrame = (timestamp) => {
+            if (!this.scanning) return;
+            
+            // Control de FPS
+            const elapsed = timestamp - this.lastFrameTime;
+            const targetInterval = 1000 / this.app.config.cameraFPS;
+            
+            if (elapsed >= targetInterval) {
+                this.processFrame(videoElement);
+                this.lastFrameTime = timestamp - (elapsed % targetInterval);
+            }
+            
+            this.animationFrame = requestAnimationFrame(processFrame);
+        };
+        
+        this.animationFrame = requestAnimationFrame(processFrame);
+        
+        // Calcular FPS cada segundo
+        this.fpsInterval = setInterval(() => {
+            const now = performance.now();
+            const elapsed = (now - this.lastFrameTime) / 1000;
+            this.fps = elapsed > 0 ? this.frameCount / elapsed : 0;
+            this.frameCount = 0;
+            this.updateStats();
+        }, 1000);
+    }
+    
+    processFrame(video) {
+        if (!video || video.readyState !== video.HAVE_ENOUGH_DATA) return;
+        
+        try {
+            this.ctx.drawImage(video, 0, 0, this.canvas.width, this.canvas.height);
+            this.frameCount++;
+            
+            const imageData = this.ctx.getImageData(0, 0, this.canvas.width, this.canvas.height);
+            const code = jsQR(imageData.data, imageData.width, imageData.height, {
+                inversionAttempts: 'dontInvert',
+            });
+            
+            if (code) {
+                this.handleQRCode(code.data);
+            }
+        } catch (error) {
+            console.warn('Error procesando frame:', error);
+        }
+    }
+    
+    handleQRCode(data) {
+        if (this.qrCache.has(data) && this.app.config.ignoreDuplicates) {
+            this.app.ui.showScanFeedback('Duplicado', 'warning');
+            return;
+        }
+        
+        this.qrCache.add(data);
+        
+        try {
+            const format = detectSHUMZUFormat(data);
+            
+            if (format === 'python') {
+                const result = this.compat.decodePythonQR(data);
+                if (result) {
+                    this.app.ui.showScanFeedback('QR detectado ✓', 'success');
+                    this.app.ui.updateScanProgress(this.compat.getProgress());
+                    
+                    if (result.metadata) {
+                        this.app.ui.displayFileInfo(result.metadata);
+                    }
+                    
+                    if (this.app.config.autoReconstruct && this.compat.getProgress() === 100) {
+                        this.startReconstruction();
+                    }
+                }
+            }
+        } catch (error) {
+            console.error('Error procesando QR:', error);
+        }
+        
+        this.updateStats();
+    }
+    
+    async startReconstruction() {
+        if (this.compat.isEncrypted) {
+            // Pedir contraseña
+            this.app.ui.showPasswordModal().then(password => {
+                if (password) {
+                    this.reconstructFile(password);
+                }
+            });
+        } else {
+            this.reconstructFile();
+        }
+    }
+    
+    async reconstructFile(password = '') {
+        try {
+            this.app.showNotification('Reconstruyendo archivo...', 'info');
+            const result = await this.compat.reconstructFile(password);
+            
+            if (result.hashMatches) {
+                this.app.showNotification('✅ Archivo reconstruido exitosamente', 'success');
+                
+                // Descargar archivo
+                const blob = new Blob([result.data]);
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = result.metadata.n;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            } else {
+                this.app.showNotification('⚠️ Hash no coincide - archivo puede estar corrupto', 'warning');
+            }
+        } catch (error) {
+            this.app.showNotification(`Error reconstruyendo: ${error.message}`, 'error');
+        }
+    }
+    
+    updateStats() {
+        const stats = {
+            fps: this.fps.toFixed(1),
+            totalScanned: this.qrCache.size,
+            progress: this.compat.getProgress(),
+            uniqueBlocks: this.compat.qrData.size
+        };
+        
+        this.app.ui.updateScannerStats(stats);
+    }
+    
+    pause() {
+        this.scanning = false;
+        if (this.animationFrame) {
+            cancelAnimationFrame(this.animationFrame);
+            this.animationFrame = null;
+        }
+        if (this.fpsInterval) {
+            clearInterval(this.fpsInterval);
+            this.fpsInterval = null;
+        }
+    }
+    
+    stopCamera() {
+        this.pause();
+        if (this.stream) {
+            this.stream.getTracks().forEach(track => track.stop());
+            this.stream = null;
+        }
+        this.app.ui.hideCameraModal();
+    }
+}
+
+class QRGenerator {
+    constructor(app) {
+        this.app = app;
+        this.file = null;
+        this.qrCodes = [];
+        this.metadata = null;
+        this.options = {
+            quality: 'M',
+            blockSize: 1024,
+            encryption: false,
+            password: '',
+            compression: true
+        };
+    }
+    
+    async processFile(file) {
+        if (!file) throw new Error('No se seleccionó archivo');
+        
+        if (file.size > this.app.config.maxFileSize) {
+            throw new Error(`Archivo demasiado grande (máx: ${this.app.formatSize(this.app.config.maxFileSize)})`);
+        }
+        
+        this.file = file;
+        this.app.ui.showSelectedFile(file);
+        
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            
+            reader.onload = async (e) => {
+                try {
+                    const fileData = new Uint8Array(e.target.result);
+                    
+                    // Calcular hash
+                    const hashBuffer = await crypto.subtle.digest('SHA-256', fileData);
+                    const hash = Array.from(new Uint8Array(hashBuffer))
+                        .map(b => b.toString(16).padStart(2, '0'))
+                        .join('');
+                    
+                    this.metadata = {
+                        n: file.name,
+                        s: fileData.length,
+                        h: hash,
+                        e: this.options.encryption ? 1 : 0,
+                        c: this.options.compression ? 1 : 0,
+                        t: Math.floor(Date.now() / 1000),
+                        bs: this.options.blockSize,
+                        tb: 0
+                    };
+                    
+                    resolve(fileData);
+                } catch (error) {
+                    reject(error);
+                }
+            };
+            
+            reader.onerror = () => reject(new Error('Error leyendo archivo'));
+            reader.readAsArrayBuffer(file);
+        });
+    }
+    
+    async generateQRs(fileData) {
+        this.app.state.generating = true;
+        this.app.state.generationProgress = 0;
+        this.app.ui.showGenerationProgress(true);
+        
+        try {
+            // Comprimir datos si está habilitado
+            let processedData = fileData;
+            if (this.options.compression) {
+                this.app.ui.updateGenerationStatus('Comprimiendo datos...');
+                processedData = pako.deflate(fileData);
+            }
+            
+            // Cifrar datos si está habilitado
+            if (this.options.encryption && this.options.password) {
+                this.app.ui.updateGenerationStatus('Cifrando datos...');
+                processedData = await this.encryptData(processedData, this.options.password);
+            }
+            
+            // Dividir en bloques
+            const totalBlocks = Math.ceil(processedData.length / this.options.blockSize);
+            this.metadata.tb = totalBlocks + 1; // +1 para metadata
+            
+            // Generar QR de metadata (bloque 0)
+            const metadataBlock = {
+                i: 0,
+                m: this.metadata,
+                d: processedData.length > 0 ? 
+                    this.arrayToBase64(processedData.slice(0, Math.min(this.options.blockSize, processedData.length))) : 
+                    null
+            };
+            
+            this.app.ui.updateGenerationProgress(10);
+            await this.generateQRBlock(metadataBlock, 0);
+            
+            // Generar QR para cada bloque de datos
+            for (let i = 1; i <= totalBlocks; i++) {
+                if (!this.app.state.generating) break; // Permitir cancelación
+                
+                const start = (i - 1) * this.options.blockSize;
+                const end = Math.min(start + this.options.blockSize, processedData.length);
+                const blockData = processedData.slice(start, end);
+                
+                const block = {
+                    i: i,
+                    d: this.arrayToBase64(blockData)
+                };
+                
+                const progress = 10 + (i / totalBlocks * 90);
+                this.app.ui.updateGenerationProgress(progress);
+                this.app.ui.updateGenerationStatus(`Generando bloque ${i}/${totalBlocks}`);
+                
+                await this.generateQRBlock(block, i);
+                
+                // Pequeña pausa para no bloquear el UI
+                await new Promise(resolve => setTimeout(resolve, 10));
+            }
+            
+            if (this.app.state.generating) {
+                this.app.showNotification(`${totalBlocks + 1} códigos QR generados`, 'success');
+                this.app.ui.enableDownload();
+            }
+            
+        } catch (error) {
+            throw error;
+        } finally {
+            this.app.state.generating = false;
+            this.app.ui.showGenerationProgress(false);
+        }
+    }
+    
+    async generateQRBlock(data, index) {
+        return new Promise((resolve) => {
+            const qrData = JSON.stringify(data);
+            const qrItem = {
+                index: index,
+                data: qrData,
+                type: index === 0 ? 'metadata' : 'data'
+            };
+            
+            this.qrCodes.push(qrItem);
+            this.app.ui.addQRToGallery(qrItem, index);
+            
+            resolve();
+        });
+    }
+    
+    async encryptData(data, password) {
+        // Implementación básica de cifrado
+        const encoder = new TextEncoder();
+        const passwordBuffer = encoder.encode(password);
+        
+        const key = await crypto.subtle.importKey(
+            'raw',
+            passwordBuffer,
+            { name: 'PBKDF2' },
+            false,
+            ['deriveKey']
+        );
+        
+        const salt = crypto.getRandomValues(new Uint8Array(16));
+        const derivedKey = await crypto.subtle.deriveKey(
+            {
+                name: 'PBKDF2',
+                salt: salt,
+                iterations: 100000,
+                hash: 'SHA-256'
+            },
+            key,
+            { name: 'AES-GCM', length: 256 },
+            false,
+            ['encrypt']
+        );
+        
+        const iv = crypto.getRandomValues(new Uint8Array(12));
+        const encrypted = await crypto.subtle.encrypt(
+            {
+                name: 'AES-GCM',
+                iv: iv
+            },
+            derivedKey,
+            data
+        );
+        
+        // Combinar salt + iv + datos cifrados
+        const result = new Uint8Array(salt.length + iv.length + encrypted.byteLength);
+        result.set(salt);
+        result.set(iv, salt.length);
+        result.set(new Uint8Array(encrypted), salt.length + iv.length);
+        
+        return result;
+    }
+    
+    arrayToBase64(array) {
+        return btoa(String.fromCharCode(...array));
+    }
+    
+    reset() {
+        this.file = null;
+        this.qrCodes = [];
+        this.metadata = null;
+        this.app.ui.resetGenerationUI();
+    }
+}
+
+class UIManager {
+    constructor(app) {
+        this.app = app;
+        this.elements = this.cacheElements();
+        this.passwordModalResolve = null;
+    }
+    
+    cacheElements() {
+        return {
+            // Modo
+            modeScan: document.getElementById('mode-scan'),
+            modeGenerate: document.getElementById('mode-generate'),
+            
+            // Escaneo
+            openCamera: document.getElementById('open-camera'),
+            cameraModal: document.getElementById('camera-modal'),
+            cameraStream: document.getElementById('camera-stream'),
+            closeModal: document.getElementById('close-modal'),
+            scanFeedback: document.getElementById('scan-feedback'),
+            uploadFiles: document.getElementById('upload-files'),
+            fileInput: document.getElementById('file-input'),
+            
+            // Progreso
+            scanProgressContainer: document.getElementById('scan-progress-container'),
+            scanProgressPercent: document.getElementById('scan-progress-percent'),
+            scanProgressFill: document.getElementById('scan-progress-fill'),
+            scannedFrames: document.getElementById('scanned-frames'),
+            detectedQrs: document.getElementById('detected-qrs'),
+            scanFps: document.getElementById('scan-fps'),
+            
+            // Generación
+            generateFileInput: document.getElementById('generate-file-input'),
+            dropZone: document.getElementById('drop-zone'),
+            selectedFileInfo: document.getElementById('selected-file-info'),
+            selectedFileName: document.getElementById('selected-file-name'),
+            selectedFileSize: document.getElementById('selected-file-size'),
+            removeFile: document.getElementById('remove-file'),
+            
+            generationProgress: document.querySelector('.generation-progress'),
+            generationProgressPercent: document.getElementById('generation-progress-percent'),
+            generationProgressFill: document.getElementById('generation-progress-fill'),
+            generationStatus: document.getElementById('generation-status'),
+            qrCount: document.getElementById('qr-count'),
+            
+            qrGallery: document.getElementById('qr-gallery'),
+            generateQRBtn: document.getElementById('generate-qr'),
+            downloadAllBtn: document.getElementById('download-all'),
+            resetGeneration: document.getElementById('reset-generation'),
+            
+            // Opciones
+            encryptionToggle: document.getElementById('encryption-toggle'),
+            encryptionOptions: document.getElementById('encryption-options'),
+            encryptionPassword: document.getElementById('encryption-password'),
+            encryptionConfirm: document.getElementById('encryption-confirm'),
+            
+            // Tema
+            themeToggle: document.getElementById('theme-toggle'),
+            
+            // Modal de contraseña
+            passwordModal: document.getElementById('password-modal'),
+            passwordInput: document.getElementById('password-input'),
+            confirmPassword: document.getElementById('confirm-password'),
+            cancelPassword: document.getElementById('cancel-password'),
+            togglePassword: document.getElementById('toggle-password'),
+            
+            // Reconstrucción
+            reconstructBtn: document.getElementById('reconstruct-btn')
+        };
+    }
+    
+    setupEventListeners() {
+        // Modo
+        this.elements.modeScan.addEventListener('click', () => this.app.switchMode('scan'));
+        this.elements.modeGenerate.addEventListener('click', () => this.app.switchMode('generate'));
+        
+        // Cámara
+        this.elements.openCamera.addEventListener('click', () => this.app.scanner.startCamera());
+        this.elements.closeModal.addEventListener('click', () => this.app.scanner.stopCamera());
+        
+        // Subida de archivos (modo escaneo)
+        this.elements.uploadFiles.addEventListener('click', () => this.elements.fileInput.click());
+        this.elements.fileInput.addEventListener('change', (e) => this.handleScanFileUpload(e));
+        
+        // Generación - Subida de archivos
+        this.elements.dropZone.addEventListener('click', () => this.elements.generateFileInput.click());
+        this.elements.generateFileInput.addEventListener('change', (e) => this.handleFileSelect(e));
+        this.elements.removeFile.addEventListener('click', () => this.clearSelectedFile());
+        
+        // Arrastrar y soltar
+        this.elements.dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            this.elements.dropZone.style.borderColor = 'var(--primary-color)';
+            this.elements.dropZone.style.backgroundColor = 'rgba(0, 0, 0, 0.02)';
+        });
+        
+        this.elements.dropZone.addEventListener('dragleave', () => {
+            this.elements.dropZone.style.borderColor = 'var(--border-color)';
+            this.elements.dropZone.style.backgroundColor = '';
+        });
+        
+        this.elements.dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            this.elements.dropZone.style.borderColor = 'var(--border-color)';
+            this.elements.dropZone.style.backgroundColor = '';
+            
+            if (e.dataTransfer.files.length) {
+                this.handleFileSelect({ target: { files: e.dataTransfer.files } });
+            }
+        });
+        
+        // Generar QR
+        this.elements.generateQRBtn.addEventListener('click', async () => {
+            if (!this.app.generator.file) {
+                this.app.showNotification('Selecciona un archivo primero', 'warning');
+                return;
+            }
+            
+            if (this.app.generator.options.encryption) {
+                const password = this.elements.encryptionPassword.value;
+                const confirm = this.elements.encryptionConfirm.value;
+                
+                if (!password || password.length < 8) {
+                    this.app.showNotification('La contraseña debe tener al menos 8 caracteres', 'warning');
+                    return;
+                }
+                
+                if (password !== confirm) {
+                    this.app.showNotification('Las contraseñas no coinciden', 'error');
+                    return;
+                }
+                
+                this.app.generator.options.password = password;
+            }
+            
+            try {
+                this.elements.generateQRBtn.disabled = true;
+                this.elements.generateQRBtn.innerHTML = '<span class="loading-spinner"></span>Generando...';
+                
+                const fileData = await this.app.generator.processFile(this.app.generator.file);
+                await this.app.generator.generateQRs(fileData);
+                
+            } catch (error) {
+                this.app.showNotification(`Error: ${error.message}`, 'error');
+            } finally {
+                this.elements.generateQRBtn.disabled = false;
+                this.elements.generateQRBtn.innerHTML = '<span>⚡ Generar Códigos QR</span>';
+            }
+        });
+        
+        // Limpiar generación
+        this.elements.resetGeneration.addEventListener('click', () => {
+            this.app.generator.reset();
+            this.app.showNotification('Generación limpiada', 'info');
+        });
+        
+        // Cifrado
+        this.elements.encryptionToggle.addEventListener('change', (e) => {
+            this.elements.encryptionOptions.style.display = e.target.checked ? 'block' : 'none';
+        });
+        
+        // Tema
+        this.elements.themeToggle.addEventListener('click', () => this.toggleTheme());
+        
+        // Modal de contraseña
+        this.elements.confirmPassword.addEventListener('click', () => this.handlePasswordConfirm());
+        this.elements.cancelPassword.addEventListener('click', () => this.handlePasswordCancel());
+        this.elements.togglePassword.addEventListener('click', () => this.togglePasswordVisibility());
+        
+        // Reconstrucción
+        this.elements.reconstructBtn.addEventListener('click', () => this.app.scanner.startReconstruction());
+    }
+    
+    handleScanFileUpload(event) {
+        const files = Array.from(event.target.files);
+        if (!files.length) return;
+        
+        this.app.showNotification(`Procesando ${files.length} archivo(s)...`, 'info');
+        
+        // Por simplicidad, procesamos solo el primer archivo
+        const file = files[0];
+        const reader = new FileReader();
+        
+        reader.onload = (e) => {
+            // Crear una imagen para procesar con jsQR
+            const img = new Image();
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                canvas.width = img.width;
+                canvas.height = img.height;
+                ctx.drawImage(img, 0, 0);
+                
+                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                const code = jsQR(imageData.data, imageData.width, imageData.height);
+                
+                if (code) {
+                    this.app.scanner.handleQRCode(code.data);
+                    this.app.showNotification('QR detectado en imagen', 'success');
+                } else {
+                    this.app.showNotification('No se encontraron QR en la imagen', 'warning');
+                }
+            };
+            img.src = e.target.result;
+        };
+        
+        reader.readAsDataURL(file);
+    }
+    
+    handleFileSelect(event) {
+        const files = event.target.files;
+        if (!files || files.length === 0) return;
+        
+        const file = files[0];
+        this.app.generator.file = file;
+        this.showSelectedFile(file);
+    }
+    
+    showSelectedFile(file) {
+        this.elements.selectedFileName.textContent = file.name;
+        this.elements.selectedFileSize.textContent = this.app.formatSize(file.size);
+        this.elements.selectedFileInfo.style.display = 'block';
+        this.elements.generateQRBtn.disabled = false;
+    }
+    
+    clearSelectedFile() {
+        this.app.generator.file = null;
+        this.elements.selectedFileInfo.style.display = 'none';
+        this.elements.generateFileInput.value = '';
+        this.elements.generateQRBtn.disabled = true;
+    }
+    
+    updateMode(mode) {
+        // Actualizar botones de modo
+        document.querySelectorAll('.mode-btn').forEach(btn => btn.classList.remove('active'));
+        document.getElementById(`mode-${mode}`).classList.add('active');
+        
+        // Mostrar/ocultar secciones
+        document.querySelectorAll('.active-section').forEach(section => {
+            section.classList.remove('active-section');
+        });
+        document.getElementById(`${mode}-section`).classList.add('active-section');
+    }
+    
+    updateScanProgress(progress) {
+        this.elements.scanProgressContainer.style.display = 'block';
+        this.elements.scanProgressPercent.textContent = `${progress}%`;
+        this.elements.scanProgressFill.style.width = `${progress}%`;
+    }
+    
+    updateScannerStats(stats) {
+        // Actualizar estadísticas en la UI
+        document.getElementById('total-scanned').textContent = stats.totalScanned;
+        document.getElementById('unique-blocks').textContent = stats.uniqueBlocks;
+        document.getElementById('scan-fps').textContent = stats.fps;
+        
+        this.elements.scannedFrames.textContent = 'N/A'; // jsQR no proporciona frames
+        this.elements.detectedQrs.textContent = stats.totalScanned;
+        this.elements.scanFps.textContent = stats.fps;
     }
     
     showScanFeedback(message, type) {
@@ -685,113 +761,91 @@ class SHUMZUApp {
         
         setTimeout(() => {
             feedback.style.display = 'none';
-        }, 1000);
+        }, 1500);
     }
     
-    openPasswordModal() {
-        this.elements.passwordModal.style.display = 'flex';
-        this.elements.passwordInput.focus();
+    showGenerationProgress(show) {
+        this.elements.generationProgress.style.display = show ? 'block' : 'none';
     }
     
-    closePasswordModal() {
-        this.elements.passwordModal.style.display = 'none';
-        this.elements.passwordInput.value = '';
+    updateGenerationProgress(percent) {
+        this.app.state.generationProgress = percent;
+        this.elements.generationProgressPercent.textContent = `${Math.round(percent)}%`;
+        this.elements.generationProgressFill.style.width = `${percent}%`;
     }
     
-    async confirmPassword() {
-        const password = this.elements.passwordInput.value;
-        if (!password) {
-            this.showNotification('Ingresa una contraseña', 'warning');
-            return;
+    updateGenerationStatus(status) {
+        this.elements.generationStatus.textContent = status;
+    }
+    
+    addQRToGallery(qrItem, index) {
+        const container = document.createElement('div');
+        container.className = 'qr-item';
+        container.innerHTML = `
+            <canvas class="qr-canvas" id="qr-canvas-${index}" width="180" height="180"></canvas>
+            <div class="qr-info">
+                <div class="qr-index">Bloque ${index}</div>
+                <div>${qrItem.type === 'metadata' ? '📋 Metadatos' : '📦 Datos'}</div>
+            </div>
+        `;
+        
+        this.elements.qrGallery.appendChild(container);
+        
+        // Generar QR visual
+        setTimeout(() => {
+            this.generateQRImage(qrItem.data, `qr-canvas-${index}`);
+        }, 10);
+    }
+    
+    generateQRImage(data, canvasId) {
+        try {
+            QRCode.toCanvas(document.getElementById(canvasId), data, {
+                width: 180,
+                margin: 1,
+                color: {
+                    dark: '#000000',
+                    light: '#ffffff'
+                },
+                errorCorrectionLevel: 'M'
+            });
+        } catch (error) {
+            console.warn('No se pudo generar QR visual:', error);
         }
+    }
+    
+    enableDownload() {
+        this.elements.downloadAllBtn.disabled = false;
+        // TODO: Implementar descarga de todos los QR en un ZIP
+    }
+    
+    resetGenerationUI() {
+        this.elements.qrGallery.innerHTML = '';
+        this.elements.selectedFileInfo.style.display = 'none';
+        this.elements.generateFileInput.value = '';
+        this.elements.generateQRBtn.disabled = true;
+        this.elements.downloadAllBtn.disabled = true;
+        this.elements.generationProgress.style.display = 'none';
+    }
+    
+    showNotification(message, type, duration = 3000) {
+        const notification = document.createElement('div');
+        notification.className = `notification ${type}`;
+        notification.innerHTML = `
+            <span>${message}</span>
+        `;
         
-        this.closePasswordModal();
-        await this.reconstructFile(password);
-    }
-    
-    togglePasswordVisibility() {
-        const input = this.elements.passwordInput;
-        input.type = input.type === 'password' ? 'text' : 'password';
-    }
-    
-    showMetadata() {
-        if (!this.scanner.compat.metadata) return;
+        document.body.appendChild(notification);
         
-        const metadata = this.scanner.compat.metadata;
-        let content = '<div class="metadata-grid">';
-        
-        for (const [key, value] of Object.entries(metadata)) {
-            content += `
-                <div class="metadata-item">
-                    <strong>${key}:</strong>
-                    <span>${typeof value === 'object' ? JSON.stringify(value) : value}</span>
-                </div>
-            `;
-        }
-        
-        content += '</div>';
-        this.elements.metadataContent.innerHTML = content;
-        this.elements.metadataModal.style.display = 'flex';
+        setTimeout(() => {
+            notification.style.animation = 'slideIn 0.3s ease reverse';
+            setTimeout(() => notification.remove(), 300);
+        }, duration);
     }
     
-    closeMetadataModal() {
-        this.elements.metadataModal.style.display = 'none';
-    }
-    
-    async switchCamera() {
-        const newMode = await this.scanner.switchCamera();
-        this.elements.cameraStream.srcObject = this.scanner.stream;
-        this.showNotification(`Cámara cambiada a ${newMode === 'environment' ? 'trasera' : 'frontal'}`, 'info');
-    }
-    
-    async toggleTorch() {
-        const enabled = await this.scanner.toggleTorch();
-        this.showNotification(`Linterna ${enabled ? 'activada' : 'desactivada'}`, 'info');
-    }
-    
-    pauseScan() {
-        this.scanner.pause();
-        document.getElementById('pause-scan').style.display = 'none';
-        document.getElementById('resume-scan').style.display = 'inline-block';
-        this.showNotification('Escaneo pausado', 'info');
-    }
-    
-    resumeScan() {
-        this.scanner.resume();
-        document.getElementById('pause-scan').style.display = 'inline-block';
-        document.getElementById('resume-scan').style.display = 'none';
-        this.showNotification('Escaneo reanudado', 'info');
-    }
-    
-    async saveScanProgress() {
-        await this.scanner.saveProgress();
-        this.showNotification('Progreso guardado', 'success');
-    }
-    
-    switchMode(mode) {
-        this.currentMode = mode;
-        
-        document.querySelectorAll('.mode-btn').forEach(btn => btn.classList.remove('active'));
-        document.getElementById(`mode-${mode}`).classList.add('active');
-        
-        document.querySelectorAll('.active-section').forEach(section => {
-            section.classList.remove('active-section');
-        });
-        document.getElementById(`${mode}-section`).classList.add('active-section');
-    }
-    
-    loadConfig() {
-        const saved = localStorage.getItem('shumzu_config');
-        if (saved) {
-            this.config = { ...this.config, ...JSON.parse(saved) };
-        }
-        
-        document.getElementById('auto-reconstruct').checked = this.config.autoReconstruct;
-        document.getElementById('ignore-duplicates').checked = this.config.ignoreDuplicates;
-    }
-    
-    saveConfig() {
-        localStorage.setItem('shumzu_config', JSON.stringify(this.config));
+    updateTheme() {
+        const savedTheme = localStorage.getItem('shumzu_theme') || 'light';
+        document.body.setAttribute('data-theme', savedTheme);
+        this.elements.themeToggle.textContent = savedTheme === 'light' ? '🌙' : '☀️';
     }
     
     toggleTheme() {
@@ -799,76 +853,78 @@ class SHUMZUApp {
         const newTheme = current === 'light' ? 'dark' : 'light';
         document.body.setAttribute('data-theme', newTheme);
         localStorage.setItem('shumzu_theme', newTheme);
-        
-        const toggle = document.getElementById('theme-toggle');
-        toggle.textContent = newTheme === 'light' ? '🌙' : '☀️';
+        this.elements.themeToggle.textContent = newTheme === 'light' ? '🌙' : '☀️';
     }
     
-    handleKeydown(e) {
-        if (e.key === 'Escape') {
-            this.closeCamera();
-            this.closePasswordModal();
-            this.closeMetadataModal();
-        }
+    displayFileInfo(metadata) {
+        // Actualizar UI con información del archivo
+        document.getElementById('file-info').style.display = 'block';
+        document.getElementById('info-name').textContent = metadata.n || 'Desconocido';
+        document.getElementById('info-size').textContent = this.app.formatSize(metadata.s || 0);
+        document.getElementById('info-blocks').textContent = metadata.tb ? `${metadata.tb - 1} bloques` : '-';
+        document.getElementById('info-encryption').textContent = metadata.e === 1 ? '🔒 Cifrado' : '🔓 No cifrado';
+        document.getElementById('info-date').textContent = metadata.t ? 
+            new Date(metadata.t * 1000).toLocaleDateString() : 'Desconocido';
+        document.getElementById('info-hash').textContent = metadata.h ? 
+            metadata.h.substring(0, 32) + '...' : 'No disponible';
         
-        if (e.key === 'Enter' && this.elements.passwordModal.style.display === 'flex') {
-            this.confirmPassword();
-        }
-        
-        if (e.key === ' ' && this.scanner.scanning) {
-            e.preventDefault();
-            this.pauseScan();
-        }
-        
-        if (e.key === 's' && e.ctrlKey) {
-            e.preventDefault();
-            this.saveScanProgress();
-        }
+        this.elements.reconstructBtn.style.display = 'block';
     }
     
-    closeCamera() {
-        this.scanner.stopCamera();
+    showCameraModal() {
+        this.elements.cameraModal.style.display = 'flex';
+        // Iniciar escaneo cuando el video esté listo
+        const video = this.elements.cameraStream;
+        video.onloadedmetadata = () => {
+            this.app.scanner.startScanning(video);
+        };
+    }
+    
+    hideCameraModal() {
         this.elements.cameraModal.style.display = 'none';
     }
     
-    cancelReconstruction() {
-        this.reconstructionInProgress = false;
-        this.elements.reconProgressContainer.style.display = 'none';
-        this.showNotification('Reconstrucción cancelada', 'info');
+    showPasswordModal() {
+        return new Promise((resolve) => {
+            this.passwordModalResolve = resolve;
+            this.elements.passwordModal.style.display = 'flex';
+            this.elements.passwordInput.focus();
+        });
     }
     
-    updateUI() {
-        const stats = this.scanner.getStats();
-        
-        if (stats.totalBlocks > 0) {
-            const progress = Math.round((stats.receivedBlocks / stats.totalBlocks) * 100);
-            this.elements.scanProgressPercent.textContent = `${progress}%`;
-            this.elements.scanProgressFill.style.width = `${progress}%`;
+    hidePasswordModal() {
+        this.elements.passwordModal.style.display = 'none';
+        this.elements.passwordInput.value = '';
+    }
+    
+    handlePasswordConfirm() {
+        const password = this.elements.passwordInput.value;
+        if (password) {
+            this.hidePasswordModal();
+            if (this.passwordModalResolve) {
+                this.passwordModalResolve(password);
+                this.passwordModalResolve = null;
+            }
+        } else {
+            this.app.showNotification('Ingresa una contraseña', 'warning');
         }
     }
     
-    updateUIFromProgress() {
-        const stats = this.scanner.getStats();
-        
-        if (this.scanner.compat.metadata) {
-            this.displayFileInfo(this.scanner.compat.metadata);
-        }
-        
-        if (stats.receivedBlocks > 0) {
-            this.updateScanProgress(stats.progress);
-            this.updateBlockGrid();
+    handlePasswordCancel() {
+        this.hidePasswordModal();
+        if (this.passwordModalResolve) {
+            this.passwordModalResolve(null);
+            this.passwordModalResolve = null;
         }
     }
     
-    saveToHistory(result) {
-        // Implementar guardado en historial
-        console.log('Guardando en historial:', result);
+    togglePasswordVisibility() {
+        const input = this.elements.passwordInput;
+        input.type = input.type === 'password' ? 'text' : 'password';
     }
 }
 
+// Inicializar aplicación
 document.addEventListener('DOMContentLoaded', () => {
-    const savedTheme = localStorage.getItem('shumzu_theme') || 'light';
-    document.body.setAttribute('data-theme', savedTheme);
-    
     window.SHUMZU_APP = new SHUMZUApp();
 });

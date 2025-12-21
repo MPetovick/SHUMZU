@@ -13,6 +13,7 @@
     <script src="https://cdn.jsdelivr.net/npm/jsQR@1.4.0/dist/jsQR.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/pako@2.1.0/dist/pako.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/crypto-js@4.2.0/crypto-js.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
 </head>
 <body>
     <div class="container">
@@ -162,11 +163,22 @@
             <!-- Sección de Generación (oculta por defecto) -->
             <section id="generate-section" class="generate-section" style="display: none;">
                 <h2>Generar Códigos QR</h2>
-                <div class="upload-area" id="drop-zone">
-                    <div class="upload-icon">📁</div>
-                    <p>Arrastra y suelta archivos aquí</p>
-                    <p class="upload-subtext">o haz clic para seleccionar</p>
-                    <input type="file" id="generate-file-input" style="display: none;">
+                
+                <div class="file-upload-area">
+                    <div class="upload-area" id="drop-zone">
+                        <div class="upload-icon">📁</div>
+                        <p>Arrastra y suelta archivos aquí</p>
+                        <p class="upload-subtext">o haz clic para seleccionar (máx. 50MB)</p>
+                        <input type="file" id="generate-file-input" style="display: none;">
+                    </div>
+                    
+                    <div id="selected-file-info" class="selected-file-info" style="display: none;">
+                        <div class="file-preview">
+                            <span id="selected-file-name"></span>
+                            <span id="selected-file-size" class="file-size"></span>
+                            <button id="remove-file" class="btn-cancel small">✕</button>
+                        </div>
+                    </div>
                 </div>
                 
                 <div class="generate-options">
@@ -181,11 +193,24 @@
                     </div>
                     
                     <div class="option-group">
+                        <label for="block-size">Tamaño de bloque:</label>
+                        <select id="block-size">
+                            <option value="512">512 bytes</option>
+                            <option value="1024" selected>1 KB</option>
+                            <option value="2048">2 KB</option>
+                            <option value="4096">4 KB</option>
+                        </select>
+                    </div>
+                    
+                    <div class="option-group">
                         <label for="encryption-toggle">
                             <input type="checkbox" id="encryption-toggle">
                             <span>🔒 Habilitar cifrado</span>
                         </label>
-                        <input type="password" id="encryption-password" placeholder="Contraseña" style="display: none;">
+                        <div id="encryption-options" style="display: none; margin-top: 10px;">
+                            <input type="password" id="encryption-password" placeholder="Contraseña (mín. 8 caracteres)">
+                            <input type="password" id="encryption-confirm" placeholder="Confirmar contraseña" style="margin-top: 5px;">
+                        </div>
                     </div>
                     
                     <div class="option-group">
@@ -196,14 +221,31 @@
                     </div>
                 </div>
                 
-                <div class="generate-preview" id="qr-preview"></div>
+                <div class="generation-progress" style="display: none;">
+                    <div class="progress-header">
+                        <h3>Generando códigos QR</h3>
+                        <span id="generation-progress-percent">0%</span>
+                    </div>
+                    <div class="progress-bar">
+                        <div id="generation-progress-fill" class="progress-fill"></div>
+                    </div>
+                    <div class="progress-details">
+                        <span id="generation-status">Preparando...</span>
+                        <span id="qr-count">0 códigos</span>
+                    </div>
+                </div>
+                
+                <div class="qr-gallery" id="qr-gallery"></div>
                 
                 <div class="action-buttons">
                     <button id="generate-qr" class="btn-primary" disabled>
-                        <span>⚡ Generar QR</span>
+                        <span>⚡ Generar Códigos QR</span>
                     </button>
                     <button id="download-all" class="btn-secondary" disabled>
-                        <span>📥 Descargar Todos</span>
+                        <span>📥 Descargar Todos (.zip)</span>
+                    </button>
+                    <button id="reset-generation" class="btn-cancel">
+                        <span>🗑️ Limpiar</span>
                     </button>
                 </div>
             </section>
@@ -237,37 +279,39 @@
                     <button id="switch-camera" class="btn-secondary small">🔄 Cambiar cámara</button>
                     <button id="toggle-torch" class="btn-secondary small">💡 Linterna</button>
                 </div>
-                <video id="camera-stream" playsinline autoplay></video>
-                <div id="scan-overlay" class="scan-overlay">
-                    <div class="scan-guide"></div>
-                    <div class="scan-target"></div>
+                <div class="camera-wrapper">
+                    <video id="camera-stream" playsinline autoplay></video>
+                    <div class="scan-overlay">
+                        <div class="scan-guide"></div>
+                        <div class="scan-target"></div>
+                    </div>
+                    <div id="scan-feedback" class="scan-feedback"></div>
                 </div>
-                <div id="scan-feedback" class="scan-feedback"></div>
-            </div>
-            
-            <div class="scan-statistics">
-                <div class="stat-item">
-                    <div id="total-scanned" class="stat-value">0</div>
-                    <div class="stat-label">Total QR</div>
+                
+                <div class="scan-statistics">
+                    <div class="stat-item">
+                        <div id="total-scanned" class="stat-value">0</div>
+                        <div class="stat-label">Total QR</div>
+                    </div>
+                    <div class="stat-item">
+                        <div id="unique-blocks" class="stat-value">0</div>
+                        <div class="stat-label">Bloques únicos</div>
+                    </div>
+                    <div class="stat-item">
+                        <div id="scan-speed" class="stat-value">0</div>
+                        <div class="stat-label">QR/seg</div>
+                    </div>
+                    <div class="stat-item">
+                        <div id="scan-resolution" class="stat-value">-</div>
+                        <div class="stat-label">Resolución</div>
+                    </div>
                 </div>
-                <div class="stat-item">
-                    <div id="unique-blocks" class="stat-value">0</div>
-                    <div class="stat-label">Bloques únicos</div>
+                
+                <div class="modal-actions">
+                    <button id="pause-scan" class="btn-secondary">⏸️ Pausar</button>
+                    <button id="resume-scan" class="btn-secondary" style="display: none;">▶️ Reanudar</button>
+                    <button id="save-scan" class="btn-primary">💾 Guardar Progreso</button>
                 </div>
-                <div class="stat-item">
-                    <div id="scan-speed" class="stat-value">0</div>
-                    <div class="stat-label">QR/seg</div>
-                </div>
-                <div class="stat-item">
-                    <div id="scan-resolution" class="stat-value">-</div>
-                    <div class="stat-label">Resolución</div>
-                </div>
-            </div>
-            
-            <div class="modal-actions">
-                <button id="pause-scan" class="btn-secondary">⏸️ Pausar</button>
-                <button id="resume-scan" class="btn-secondary" style="display: none;">▶️ Reanudar</button>
-                <button id="save-scan" class="btn-primary">💾 Guardar Progreso</button>
             </div>
         </div>
     </div>
@@ -285,7 +329,7 @@
             <p class="password-hint">Nota: Use la misma contraseña que usó con shumzuX.py</p>
             <div class="modal-buttons">
                 <button id="confirm-password" class="btn-primary">Descifrar</button>
-                <button id="cancel-password" class="btn-secondary">Cancelar</button>
+                                <button id="cancel-password" class="btn-secondary">Cancelar</button>
             </div>
         </div>
     </div>
