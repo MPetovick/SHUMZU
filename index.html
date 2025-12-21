@@ -3,120 +3,223 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SHUMZU - Almacenamiento Seguro con QR</title>
-    <meta name="description" content="SHUMZU combina compresión, cifrado y códigos QR para ofrecer una solución segura y eficiente para el almacenamiento y transmisión de datos.">
+    <title>SHUMZU+ - Almacenamiento QR Compatible</title>
+    <meta name="description" content="SHUMZU+ es compatible con QR generados por shumzuX.py para escaneo y reconstrucción rápida">
     
-    <!-- Hojas de estilo -->
     <link rel="stylesheet" href="styles.css">
-    
-    <!-- Favicon -->
     <link rel="icon" type="image/png" href="./rsc/logo_SHUMZU.png">
     
-    <!-- Scripts de terceros -->
     <script src="https://cdn.jsdelivr.net/npm/jsQR@1.4.0/dist/jsQR.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/pako@2.1.0/dist/pako.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/argon2-browser@1.18.0/lib/argon2.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/blake2b@1.2.0/blake2b.min.js"></script>
-    
-    <!-- Scripts propios (se cargan al final del body) -->
+    <script src="https://cdn.jsdelivr.net/npm/crypto-js@4.2.0/crypto-js.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
 </head>
 <body>
     <div class="container">
         <header>
             <div class="logo-container">
                 <div class="logo-shape">
-                    <div class="logo-inner">SZ</div>
+                    <div class="logo-inner">SZ+</div>
                 </div>
-                <h1 class="logo-text">SHUMZU</h1>
+                <h1 class="logo-text">SHUMZU+</h1>
             </div>
-            <p class="tagline">Almacenamiento Seguro con Códigos QR</p>
+            <p class="tagline">Compatible con shumzuX.py • Escaneo Ultra Rápido</p>
             <button id="theme-toggle" class="theme-toggle">🌙</button>
         </header>
 
         <main class="main-content">
-            <section class="scan-section">
+            <!-- Sección de Modo -->
+            <section class="mode-section">
+                <div class="mode-selector">
+                    <button id="mode-scan" class="mode-btn active">📱 Escanear QR</button>
+                    <button id="mode-generate" class="mode-btn">⚡ Generar QR</button>
+                </div>
+            </section>
+
+            <!-- Sección de Escaneo (predeterminada) -->
+            <section id="scan-section" class="scan-section active-section">
                 <h2>Escanear Códigos QR</h2>
-                <div class="buttons">
-                    <button id="open-camera" class="btn-primary">Abrir Cámara</button>
-                    <button class="btn-secondary" onclick="document.getElementById('file-input').click()">
-                        Subir Imágenes/Video
-                    </button>
-                    <input type="file" id="file-input" accept="image/*,video/*" multiple style="display: none;">
+                <div class="scan-options">
+                    <div class="buttons">
+                        <button id="open-camera" class="btn-primary">
+                            <span>📷 Cámara en Tiempo Real</span>
+                            <small>5 FPS • Detección automática</small>
+                        </button>
+                        <button id="upload-files" class="btn-secondary">
+                            <span>📁 Subir Archivos</span>
+                            <small>Imágenes, GIF, Video</small>
+                        </button>
+                        <input type="file" id="file-input" accept="image/*,video/*,.gif" multiple style="display: none;">
+                    </div>
+                    
+                    <div class="scan-modes">
+                        <label class="mode-option">
+                            <input type="checkbox" id="auto-reconstruct" checked>
+                            <span>Reconstruir automáticamente</span>
+                        </label>
+                        <label class="mode-option">
+                            <input type="checkbox" id="ignore-duplicates" checked>
+                            <span>Ignorar duplicados</span>
+                        </label>
+                    </div>
                 </div>
                 
-                <div id="upload-progress-container" class="progress-container" style="display: none;">
+                <!-- Progreso de escaneo -->
+                <div id="scan-progress-container" class="progress-container enhanced" style="display: none;">
                     <div class="progress-header">
-                        <h3>Procesando archivos</h3>
-                        <span id="upload-progress-percent" class="progress-percent">0%</span>
+                        <h3>Escaneo en progreso</h3>
+                        <span id="scan-progress-percent" class="progress-percent">0%</span>
                     </div>
                     <div class="progress-bar">
-                        <div id="upload-progress-fill" class="progress-fill"></div>
+                        <div id="scan-progress-fill" class="progress-fill"></div>
                     </div>
-                    <div id="upload-progress-details" class="progress-details">0/0 archivos procesados</div>
+                    <div class="progress-stats">
+                        <div class="stat-item">
+                            <span class="stat-value" id="scanned-frames">0</span>
+                            <span class="stat-label">Frames</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-value" id="detected-qrs">0</span>
+                            <span class="stat-label">QR Detectados</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-value" id="scan-fps">0</span>
+                            <span class="stat-label">FPS</span>
+                        </div>
+                    </div>
                 </div>
                 
+                <!-- Progreso de reconstrucción -->
                 <div id="reconstruction-progress-container" class="progress-container enhanced" style="display: none;">
                     <div class="progress-header">
                         <h3>Reconstruyendo archivo</h3>
-                        <span id="reconstruction-progress-percent" class="progress-percent">0%</span>
+                        <button id="cancel-reconstruction" class="btn-cancel">Cancelar</button>
                     </div>
                     <div class="progress-bar">
                         <div id="reconstruction-progress-fill" class="progress-fill"></div>
                     </div>
-                    <div id="reconstruction-progress-details" class="progress-details">0/0 bloques escaneados</div>
-                    
-                    <div class="progress-stats">
-                        <span id="blocks-received">0 recibidos</span>
-                        <span id="blocks-missing">0 faltantes</span>
+                    <div id="reconstruction-progress-details" class="progress-details">
+                        <span id="blocks-info">0/0 bloques</span>
+                        <span id="data-size">0 B</span>
                     </div>
                     
-                    <div class="block-status" id="block-status"></div>
+                    <div class="block-grid" id="block-grid"></div>
+                    
+                    <div class="reconstruction-stats">
+                        <div class="stat-item">
+                            <span class="stat-label">Compatibilidad:</span>
+                            <span id="compatibility-status" class="stat-value compatible">SHUMZU Python</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">Corrección de errores:</span>
+                            <span id="error-correction-status" class="stat-value">Reed-Solomon activo</span>
+                        </div>
+                    </div>
                 </div>
                 
+                <!-- Información del archivo -->
                 <div id="file-info" class="file-info" style="display: none;">
-                    <h3>Información del Archivo</h3>
+                    <div class="section-header">
+                        <h3>Archivo Detectado</h3>
+                        <button id="show-metadata" class="btn-secondary small">Ver Metadatos</button>
+                    </div>
                     <div class="file-info-grid">
                         <div class="file-info-item">
-                            <div class="file-info-label">Nombre:</div>
+                            <div class="file-info-label">📄 Nombre:</div>
                             <div id="info-name" class="file-info-value">-</div>
                         </div>
                         <div class="file-info-item">
-                            <div class="file-info-label">Tipo:</div>
-                            <div id="info-type" class="file-info-value">-</div>
-                        </div>
-                        <div class="file-info-item">
-                            <div class="file-info-label">Tamaño:</div>
+                            <div class="file-info-label">📦 Tamaño:</div>
                             <div id="info-size" class="file-info-value">-</div>
                         </div>
                         <div class="file-info-item">
-                            <div class="file-info-label">Hash (BLAKE2b):</div>
-                            <div id="info-hash" class="file-info-value hash-display">-</div>
-                        </div>
-                        <div class="file-info-item">
-                            <div class="file-info-label">Bloques:</div>
+                            <div class="file-info-label">🧩 Bloques:</div>
                             <div id="info-blocks" class="file-info-value">-</div>
                         </div>
-                        <div id="encrypted-info" class="file-info-item" style="display: none;">
-                            <div class="file-info-label">Estado:</div>
-                            <div class="file-info-value" style="color: var(--success-color);">🔒 Cifrado</div>
+                        <div class="file-info-item">
+                            <div class="file-info-label">🔐 Estado:</div>
+                            <div id="info-encryption" class="file-info-value">-</div>
                         </div>
+                        <div class="file-info-item">
+                            <div class="file-info-label">📅 Fecha:</div>
+                            <div id="info-date" class="file-info-value">-</div>
+                        </div>
+                        <div class="file-info-item">
+                            <div class="file-info-label">✅ Hash:</div>
+                            <div id="info-hash" class="file-info-value hash-display">-</div>
+                        </div>
+                    </div>
+                    
+                    <div class="action-buttons">
+                        <button id="reconstruct-btn" class="btn-reconstruct" style="display: none;">
+                            <span>🔧 Reconstruir Archivo</span>
+                        </button>
+                        <button id="export-data" class="btn-secondary small">💾 Exportar Datos</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Sección de Generación (oculta por defecto) -->
+            <section id="generate-section" class="generate-section" style="display: none;">
+                <h2>Generar Códigos QR</h2>
+                <div class="upload-area" id="drop-zone">
+                    <div class="upload-icon">📁</div>
+                    <p>Arrastra y suelta archivos aquí</p>
+                    <p class="upload-subtext">o haz clic para seleccionar</p>
+                    <input type="file" id="generate-file-input" style="display: none;">
+                </div>
+                
+                <div class="generate-options">
+                    <div class="option-group">
+                        <label for="qr-quality">Calidad de corrección:</label>
+                        <select id="qr-quality">
+                            <option value="L">Baja (7%)</option>
+                            <option value="M" selected>Media (15%)</option>
+                            <option value="Q">Alta (25%)</option>
+                            <option value="H">Máxima (30%)</option>
+                        </select>
+                    </div>
+                    
+                    <div class="option-group">
+                        <label for="encryption-toggle">
+                            <input type="checkbox" id="encryption-toggle">
+                            <span>🔒 Habilitar cifrado</span>
+                        </label>
+                        <input type="password" id="encryption-password" placeholder="Contraseña" style="display: none;">
+                    </div>
+                    
+                    <div class="option-group">
+                        <label for="compression-toggle">
+                            <input type="checkbox" id="compression-toggle" checked>
+                            <span>🗜️ Comprimir datos</span>
+                        </label>
                     </div>
                 </div>
                 
-                <div class="buttons" style="margin-top: 20px;">
-                    <button id="reconstruct-btn" class="btn-reconstruct" style="display: none;">
-                        <span>Reconstruir Archivo</span>
+                <div class="generate-preview" id="qr-preview"></div>
+                
+                <div class="action-buttons">
+                    <button id="generate-qr" class="btn-primary" disabled>
+                        <span>⚡ Generar QR</span>
+                    </button>
+                    <button id="download-all" class="btn-secondary" disabled>
+                        <span>📥 Descargar Todos</span>
                     </button>
                 </div>
             </section>
 
+            <!-- Historial -->
             <section class="history-section">
                 <div class="section-header">
-                    <h2>Historial de Reconstrucción</h2>
-                    <button id="clear-history" class="btn-clear">Limpiar Historial</button>
+                    <h2>Historial de Actividad</h2>
+                    <div class="history-filters">
+                        <button id="filter-all" class="filter-btn active">Todo</button>
+                        <button id="filter-scans" class="filter-btn">Escaneos</button>
+                        <button id="filter-generations" class="filter-btn">Generaciones</button>
+                    </div>
                 </div>
                 <div id="history-list" class="history-list">
-                    <p class="no-history">No hay archivos reconstruidos recientemente</p>
+                    <p class="no-history">No hay actividad reciente</p>
                 </div>
             </section>
         </main>
@@ -126,33 +229,46 @@
     <div id="camera-modal" class="modal">
         <div class="modal-content">
             <button id="close-modal" class="close-btn">&times;</button>
-            <h2>Escanear Códigos QR</h2>
-            <p class="scan-help">Apunta la cámara a los códigos QR para escanearlos automáticamente.</p>
+            <h2>Escanear QR en Tiempo Real</h2>
+            <p class="scan-help">Apunta la cámara a los códigos QR. La detección es automática.</p>
             
             <div class="camera-container">
-                <div id="scan-overlay" class="scan-overlay">
-                    <div class="scan-guide"></div>
+                <div class="camera-controls">
+                    <button id="switch-camera" class="btn-secondary small">🔄 Cambiar cámara</button>
+                    <button id="toggle-torch" class="btn-secondary small">💡 Linterna</button>
                 </div>
                 <video id="camera-stream" playsinline autoplay></video>
-                <div id="scan-success" class="scan-success">✓ Escaneado</div>
+                <div id="scan-overlay" class="scan-overlay">
+                    <div class="scan-guide"></div>
+                    <div class="scan-target"></div>
+                </div>
+                <div id="scan-feedback" class="scan-feedback"></div>
             </div>
             
             <div class="scan-statistics">
                 <div class="stat-item">
                     <div id="total-scanned" class="stat-value">0</div>
-                    <div class="stat-label">Total escaneos</div>
+                    <div class="stat-label">Total QR</div>
                 </div>
                 <div class="stat-item">
-                    <div id="unique-scanned" class="stat-value">0</div>
-                    <div class="stat-label">Únicos</div>
+                    <div id="unique-blocks" class="stat-value">0</div>
+                    <div class="stat-label">Bloques únicos</div>
                 </div>
                 <div class="stat-item">
-                    <div id="duplicates" class="stat-value">0</div>
-                    <div class="stat-label">Duplicados</div>
+                    <div id="scan-speed" class="stat-value">0</div>
+                    <div class="stat-label">QR/seg</div>
+                </div>
+                <div class="stat-item">
+                    <div id="scan-resolution" class="stat-value">-</div>
+                    <div class="stat-label">Resolución</div>
                 </div>
             </div>
             
-            <div id="scan-status" class="scan-status"></div>
+            <div class="modal-actions">
+                <button id="pause-scan" class="btn-secondary">⏸️ Pausar</button>
+                <button id="resume-scan" class="btn-secondary" style="display: none;">▶️ Reanudar</button>
+                <button id="save-scan" class="btn-primary">💾 Guardar Progreso</button>
+            </div>
         </div>
     </div>
 
@@ -161,27 +277,31 @@
         <div class="modal-content">
             <button id="close-password-modal" class="close-btn">&times;</button>
             <h2>Archivo Cifrado</h2>
-            <p>Este archivo está protegido con contraseña. Introduce la contraseña para continuar.</p>
-            <input type="password" id="password-input" placeholder="Contraseña">
+            <p>Este archivo fue cifrado con shumzuX.py. Introduce la contraseña para continuar.</p>
+            <div class="password-input-group">
+                <input type="password" id="password-input" placeholder="Contraseña usada en Python" autocomplete="current-password">
+                <button id="toggle-password" class="btn-eye">👁️</button>
+            </div>
+            <p class="password-hint">Nota: Usa la misma contraseña que usaste con shumzuX.py</p>
             <div class="modal-buttons">
-                <button id="confirm-password" class="btn-primary">Aceptar</button>
+                <button id="confirm-password" class="btn-primary">Descifrar</button>
                 <button id="cancel-password" class="btn-secondary">Cancelar</button>
             </div>
         </div>
     </div>
 
-    <!-- Modal de Detalles -->
-    <div id="file-details-modal" class="modal">
+    <!-- Modal de Metadatos -->
+    <div id="metadata-modal" class="modal">
         <div class="modal-content">
-            <button id="close-details-modal" class="close-btn">&times;</button>
-            <h2>Detalles del Archivo</h2>
-            <div id="file-details-content"></div>
+            <button id="close-metadata-modal" class="close-btn">&times;</button>
+            <h2>Metadatos del Archivo</h2>
+            <div id="metadata-content" class="metadata-content"></div>
         </div>
     </div>
 
-    <!-- Scripts propios -->
+    <!-- Scripts -->
     <script src="reed-solomon.js"></script>
+    <script src="shumzu-compat.js"></script>
     <script src="script.js"></script>
-    <!-- Nota: worker.js se carga dinámicamente -->
 </body>
 </html>
