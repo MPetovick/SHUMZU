@@ -1,398 +1,1990 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SHUMZU+ - Almacenamiento QR Compatible</title>
-    <meta name="description" content="SHUMZU+ es compatible con QR generados por shumzuX.py para escaneo y reconstrucción rápida">
-    
-    <link rel="stylesheet" href="styles.css">
-    <link rel="icon" type="image/png" href="./rsc/logo_SHUMZU.png">
-    
-    <!-- Scripts de terceros -->
-    <script src="https://cdn.jsdelivr.net/npm/jsQR@1.4.0/dist/jsQR.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/pako@2.1.0/dist/pako.min.js"></script>
-    <!-- QRCode.js para generación de QR -->
-    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
-    <!-- GIF.js para generar GIF animado -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/gif.js/0.2.0/gif.js"></script>
-    <!-- JSZip para crear archivos ZIP -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#f7f1e3" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1c1a16" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Blottoku">
+<meta name="description" content="Blottoku — rompecabezas de reparto con restricciones tipo sudoku">
+<title>Blottoku</title>
+<link rel="manifest" id="manifest-link">
+<style>
+:root{
+  --cream:#f9f4e6; --cream-2:#f3ead3;
+  --paper:#fffdf6; --paper-2:#fbf6e8;
+  --ink:#3d3428; --ink-2:#6f6351; --ink-3:#a89a83; --ink-4:#d4c9b3;
+  --line:#e8dfc8; --line-2:#d4c9b0;
+  --gold:#b8934d; --gold-2:#d4b478; --gold-bg:#f7ecd0;
+  --sage:#4a6b4a; --sage-2:#7d9a7d; --sage-bg:#e8f0e6;
+  --terra:#b8604c; --terra-bg:#fae8e0;
+  --silver:#9ba3a8; --silver-bg:#eef1f2;
+  --bronze:#a97a52; --bronze-bg:#f2e6d9;
+  --sh-sm:0 1px 2px rgba(61,52,40,.05);
+  --sh-md:0 2px 8px rgba(61,52,40,.07),0 1px 3px rgba(61,52,40,.05);
+  --sh-lg:0 8px 24px rgba(61,52,40,.10),0 2px 6px rgba(61,52,40,.06);
+  --sh-xl:0 20px 48px rgba(61,52,40,.15),0 4px 12px rgba(61,52,40,.08);
+  --r-sm:8px; --r-md:12px; --r-lg:18px; --r-xl:24px;
+  --serif:Georgia,'Iowan Old Style','Times New Roman',serif;
+  --sans:-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,system-ui,sans-serif;
+  --mono:ui-monospace,'SF Mono','Menlo','Consolas',monospace;
+  --ease-spring:cubic-bezier(.34,1.4,.64,1);
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overflow:hidden;overscroll-behavior:none;-webkit-text-size-adjust:100%}
+body{
+  font-family:var(--sans);color:var(--ink);
+  background:
+    radial-gradient(ellipse 120% 60% at 50% -10%,#fffdf6 0%,transparent 60%),
+    radial-gradient(ellipse 90% 50% at 50% 110%,#efe4c8 0%,transparent 55%),
+    var(--cream);
+  -webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;
+  text-rendering:optimizeLegibility;touch-action:manipulation;
+  user-select:none;-webkit-user-select:none;position:relative;
+}
+body:before{
+  content:"";position:fixed;inset:0;pointer-events:none;z-index:0;
+  background-image:
+    radial-gradient(rgba(61,52,40,.05) 0.5px,transparent 0.5px),
+    radial-gradient(rgba(61,52,40,.03) 0.5px,transparent 0.5px);
+  background-size:3px 3px,7px 7px;background-position:0 0,1px 1px;opacity:.6;
+}
+.app{
+  position:relative;z-index:1;display:flex;flex-direction:column;
+  height:100%;height:100dvh;max-width:520px;margin:0 auto;
+  padding-top:env(safe-area-inset-top);
+  padding-left:env(safe-area-inset-left);
+  padding-right:env(safe-area-inset-right);
+}
+.topbar{flex-shrink:0;display:flex;align-items:center;justify-content:space-between;padding:10px 16px 6px;gap:6px}
+.brand{font-family:var(--serif);font-size:22px;font-weight:500;color:var(--ink);letter-spacing:.01em;display:flex;align-items:center;gap:8px;line-height:1}
+.brand .dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--gold);box-shadow:0 0 0 3px rgba(184,147,77,.15)}
+.top-right{display:flex;gap:6px;align-items:center}
+.timer{font-family:var(--mono);font-size:13px;color:var(--ink);font-variant-numeric:tabular-nums;padding:5px 12px;border-radius:20px;background:var(--paper-2);box-shadow:var(--sh-sm);border:1px solid var(--line);letter-spacing:.02em;min-width:58px;text-align:center}
+.icon-btn{width:38px;height:38px;border-radius:50%;background:transparent;border:1px solid var(--line-2);color:var(--ink-2);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:transform .15s var(--ease-spring),background .15s ease,color .15s ease,border-color .15s ease;flex-shrink:0}
+.icon-btn:active{transform:scale(.9);background:var(--paper)}
+.icon-btn:hover{border-color:var(--gold);color:var(--gold)}
+.icon-btn.off{opacity:.4}
+.icon-btn svg{pointer-events:none}
+.stage{flex:1;min-height:0;display:flex;align-items:stretch;justify-content:center;padding:4px 12px 6px}
+.board{flex:1;max-width:460px;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) 42px;grid-template-rows:22px repeat(9,minmax(0,1fr));gap:4px;transition:opacity .3s ease;position:relative}
+.board.solved{opacity:.94}
+.board-head{grid-column:1/-1;grid-row:1;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) 42px;gap:4px;align-items:center}
+.col-head{display:flex;justify-content:space-between;gap:1px;padding:0 2px}
+.col-head .pip{font-family:var(--mono);font-size:9px;font-weight:600;color:var(--ink-3);background:var(--cream-2);width:100%;max-width:14px;height:14px;line-height:14px;text-align:center;border-radius:4px;flex-shrink:1;min-width:0;transition:color .25s ease,background .25s ease,opacity .25s ease}
+.col-head .pip.used{color:transparent;background:transparent;position:relative;opacity:.55}
+.col-head .pip.used::after{content:"";position:absolute;left:15%;right:15%;top:50%;height:1.5px;background:var(--ink-3);border-radius:1px;transform:translateY(-50%)}
+.cell{background:var(--paper);border:1px solid transparent;border-radius:var(--r-sm);color:var(--ink);font-family:var(--serif);font-size:clamp(18px,4.2vh,26px);font-weight:500;font-variant-numeric:tabular-nums;cursor:pointer;transition:background-color .15s ease,color .15s ease,box-shadow .15s ease,border-color .15s ease,transform .15s var(--ease-spring);display:flex;align-items:center;justify-content:center;position:relative;-webkit-user-select:none;user-select:none;min-width:0;min-height:0;padding:2px;will-change:transform;box-shadow:var(--sh-sm)}
+.cell:active{transform:scale(.96)}
+.cell.clue{background:var(--gold-bg);color:var(--gold);font-weight:600;box-shadow:inset 0 0 0 1px rgba(184,147,77,.15),var(--sh-sm);cursor:default}
+.cell.clue:active{transform:none}
+.cell.filled{background:var(--sage-bg);color:var(--sage);font-weight:600;box-shadow:inset 0 0 0 1px rgba(74,107,74,.14),var(--sh-sm)}
+.cell.wrong{background:var(--terra-bg);color:var(--terra);font-weight:600;box-shadow:inset 0 0 0 1px rgba(184,96,76,.28),var(--sh-sm)}
+.cell.selected{background:var(--paper);color:var(--gold);border-color:var(--gold);box-shadow:0 0 0 2px rgba(184,147,77,.22),0 0 0 1px var(--gold),var(--sh-md);z-index:2;transform:scale(1.02)}
+.cell.selected.clue{border-color:var(--gold);box-shadow:0 0 0 2px rgba(184,147,77,.25),var(--sh-md)}
+.cell.selected.wrong{border-color:var(--terra);color:var(--terra);box-shadow:0 0 0 2px rgba(184,96,76,.25),0 0 0 1px var(--terra),var(--sh-md)}
+.cell.same-row,.cell.same-col{background:rgba(247,236,208,.55)}
+.cell.same-row.filled,.cell.same-col.filled{background:rgba(232,240,230,.55);color:var(--sage)}
+.cell.same-row.wrong,.cell.same-col.wrong{background:rgba(250,232,224,.75);color:var(--terra)}
+.cell.same-row.clue,.cell.same-col.clue{background:rgba(247,236,208,.75)}
+.cell.same-digit{box-shadow:inset 0 0 0 1.5px var(--gold-2),var(--sh-sm)}
+.cell.conflict{background:var(--terra-bg);color:var(--terra);box-shadow:inset 0 0 0 1px rgba(184,96,76,.3),var(--sh-sm);animation:shake .4s cubic-bezier(.36,.07,.19,.97)}
+.cell.conflict.clue{animation:none}
+@keyframes shake{10%,90%{transform:translateX(-1px)}20%,80%{transform:translateX(2px)}30%,50%,70%{transform:translateX(-3px)}40%,60%{transform:translateX(3px)}}
+.cell.pop{animation:pop .35s var(--ease-spring)}
+@keyframes pop{0%{transform:scale(.5);opacity:0}65%{transform:scale(1.06)}100%{transform:scale(1);opacity:1}}
+.cell.hint-pop{animation:hintPop .9s ease}
+@keyframes hintPop{0%{box-shadow:0 0 0 5px rgba(184,147,77,.55),var(--sh-sm);background:#fff;transform:scale(1.06)}40%{box-shadow:0 0 0 8px rgba(184,147,77,.20),var(--sh-sm);background:#fff;transform:scale(1.02)}100%{box-shadow:inset 0 0 0 1px rgba(184,147,77,.15),var(--sh-sm);background:var(--gold-bg);transform:scale(1)}}
+.cell.clear-pop{animation:clearPop .55s ease}
+@keyframes clearPop{
+  0%{transform:scale(1);background:var(--paper)}
+  45%{transform:scale(1.08);background:var(--terra-bg);color:var(--terra)}
+  100%{transform:scale(1);background:var(--paper);color:var(--ink)}
+}
+.cell.wrong-pop{animation:wrongPop .8s ease}
+@keyframes wrongPop{
+  0%{transform:scale(1)}
+  35%{transform:scale(1.12);box-shadow:0 0 0 8px rgba(184,96,76,.28),var(--sh-sm)}
+  100%{transform:scale(1)}
+}
+.cell.notes{font-family:var(--sans);font-size:9px}
+.cell .notes-grid{position:absolute;inset:2px;display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,1fr);pointer-events:none;color:var(--ink-3);font-family:var(--mono);font-size:9px;font-weight:600}
+.cell .notes-grid span{display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .15s ease}
+.cell .notes-grid span.on{opacity:1}
+.row-sum{display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:11px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:-.02em;color:var(--ink-3);border-radius:999px;min-width:38px;height:22px;justify-self:end;align-self:center;padding:0 6px;background:transparent;transition:background .25s ease,color .25s ease,transform .25s var(--ease-spring)}
+.row-sum.ok{background:var(--sage-bg);color:var(--sage);animation:pulseOk .5s var(--ease-spring)}
+.row-sum.over{background:var(--terra-bg);color:var(--terra)}
+.row-sum.under{background:var(--gold-bg);color:var(--gold)}
+@keyframes pulseOk{0%{transform:scale(1)}40%{transform:scale(1.15)}100%{transform:scale(1)}}
+.bottom{flex-shrink:0;padding-bottom:calc(env(safe-area-inset-bottom) + 6px);display:flex;flex-direction:column;gap:6px}
+.action-strip{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:5px;padding:0 10px}
+.action-btn{background:var(--paper);border:1px solid var(--line);border-radius:var(--r-md);color:var(--ink-2);font-family:var(--sans);font-size:10.5px;font-weight:600;letter-spacing:.02em;padding:8px 2px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:4px;transition:background .15s ease,color .15s ease,border-color .15s ease,transform .15s var(--ease-spring),opacity .15s ease;min-height:38px;box-shadow:var(--sh-sm);position:relative}
+.action-btn:hover:not(:disabled){border-color:var(--gold);color:var(--gold);background:var(--paper)}
+.action-btn:active:not(:disabled){transform:scale(.96)}
+.action-btn:disabled{opacity:.35;cursor:not-allowed}
+.action-btn.active{background:var(--gold-bg);border-color:var(--gold);color:var(--gold);box-shadow:0 0 0 2px rgba(184,147,77,.14),var(--sh-sm)}
+.action-btn svg{flex-shrink:0;pointer-events:none}
+.action-btn .badge{font-family:var(--mono);font-size:8.5px;font-weight:700;background:var(--gold-bg);color:var(--gold);border-radius:999px;padding:1px 4px;min-width:14px;text-align:center;line-height:1.1;margin-left:1px;transition:background .2s ease,color .2s ease}
+.action-btn:disabled .badge{background:transparent;color:var(--ink-4);box-shadow:inset 0 0 0 1px var(--line)}
+.action-btn.badge-pulse .badge{animation:badgePulse .5s var(--ease-spring)}
+@keyframes badgePulse{0%{transform:scale(1)}40%{transform:scale(1.35);background:var(--gold);color:#fff}100%{transform:scale(1)}}
+.keypad{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;padding:0 12px}
+.key{position:relative;background:var(--paper);border:1px solid var(--line);border-radius:var(--r-md);color:var(--ink);font-family:var(--serif);font-size:22px;font-weight:500;font-variant-numeric:tabular-nums;cursor:pointer;transition:background-color .15s ease,color .15s ease,transform .15s var(--ease-spring),border-color .15s ease,box-shadow .15s ease,opacity .2s ease;padding:8px 4px 6px;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:50px;box-shadow:var(--sh-sm);will-change:transform}
+.key:hover:not(:disabled){border-color:var(--gold);background:var(--paper)}
+.key:active:not(:disabled){transform:scale(.92)}
+.key .count{font-family:var(--mono);font-size:9px;color:var(--ink-3);line-height:1;letter-spacing:.02em;transition:color .2s ease;margin-top:1px}
+.key:disabled{opacity:.25;cursor:not-allowed;background:var(--cream-2);border-color:transparent;color:var(--ink-4);box-shadow:none;transform:none}
+.key:disabled .count{color:var(--ink-4)}
+.key.in-col:not(:disabled){color:var(--ink-3);background:var(--paper-2)}
+.key.erase{font-family:var(--sans);color:var(--ink-2)}
+.key.erase svg{width:18px;height:18px}
+.key.erase:disabled{color:var(--ink-4)}
+.key.flash{animation:keyFlash .35s ease}
+@keyframes keyFlash{0%{background:var(--gold-bg);border-color:var(--gold);transform:scale(.95)}100%{background:var(--paper);border-color:var(--line);transform:scale(1)}}
+.overlay{position:fixed;inset:0;z-index:100;display:none;align-items:center;justify-content:center;padding:20px;background:rgba(61,52,40,.35);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);opacity:0;transition:opacity .25s ease}
+.overlay.show{display:flex;opacity:1}
+.card{background:var(--paper);border-radius:var(--r-xl);padding:26px;width:100%;max-width:380px;box-shadow:var(--sh-xl);transform:translateY(12px) scale(.97);transition:transform .4s var(--ease-spring);max-height:calc(100dvh - 40px);overflow-y:auto}
+.overlay.show .card{transform:translateY(0) scale(1)}
+.card h2{font-family:var(--serif);font-size:22px;font-weight:500;color:var(--ink);letter-spacing:.01em;margin-bottom:4px;line-height:1.2}
+.card .sub{font-size:13px;color:var(--ink-2);margin-bottom:18px;line-height:1.5}
+.diff-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:18px}
+.diff-btn{background:var(--paper-2);border:1.5px solid var(--line);border-radius:var(--r-md);color:var(--ink);padding:14px 10px;cursor:pointer;transition:all .18s ease;display:flex;flex-direction:column;align-items:center;gap:3px}
+.diff-btn:hover{border-color:var(--gold-2);background:var(--paper)}
+.diff-btn:active{transform:scale(.97)}
+.diff-btn.active{background:var(--gold-bg);border-color:var(--gold);box-shadow:0 0 0 3px rgba(184,147,77,.12)}
+.diff-btn .n{font-family:var(--serif);font-size:16px;font-weight:500;color:var(--ink);line-height:1.1}
+.diff-btn.active .n{color:var(--gold)}
+.diff-btn .c{font-family:var(--mono);font-size:10px;color:var(--ink-3);letter-spacing:.02em;text-align:center}
+.diff-btn.active .c{color:var(--gold-2)}
+.menu-actions{display:flex;gap:8px;margin-bottom:14px}
+.btn{flex:1;border-radius:var(--r-md);padding:14px 16px;font-family:var(--sans);font-size:14px;font-weight:600;letter-spacing:.02em;cursor:pointer;transition:all .18s var(--ease-spring);border:1.5px solid transparent;min-height:48px}
+.btn:active{transform:scale(.97)}
+.btn-primary{background:var(--gold);color:#fff;border-color:var(--gold);box-shadow:0 4px 12px rgba(184,147,77,.28)}
+.btn-primary:hover{background:#a67f3c;border-color:#a67f3c}
+.btn-danger{background:var(--terra);color:#fff;border-color:var(--terra);box-shadow:0 4px 12px rgba(184,96,76,.28)}
+.btn-danger:hover{background:#a04e3d;border-color:#a04e3d}
+.btn-ghost{background:transparent;color:var(--ink-2);border-color:var(--line-2)}
+.btn-ghost:hover{background:var(--paper-2);border-color:var(--line)}
+.menu-foot{display:flex;flex-direction:column;gap:10px;border-top:1px solid var(--line);padding-top:12px;margin-top:2px}
+.menu-foot-row{display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:12px;color:var(--ink-3)}
+.menu-foot a{color:var(--ink-3);cursor:pointer;text-decoration:underline;text-decoration-color:var(--line-2);transition:color .15s ease}
+.menu-foot a:hover{color:var(--gold)}
+.lang-picker{display:inline-flex;align-items:center;gap:0;padding:3px;border-radius:999px;background:var(--cream-2);border:1px solid var(--line);box-shadow:inset 0 1px 2px rgba(61,52,40,.05)}
+.lang-btn{position:relative;min-width:38px;height:26px;padding:0 10px;border-radius:999px;background:transparent;border:1px solid transparent;color:var(--ink-3);font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.06em;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:color .18s ease,background .18s ease,border-color .18s ease,box-shadow .18s ease,transform .15s var(--ease-spring);-webkit-user-select:none;user-select:none}
+.lang-btn:hover{color:var(--ink);background:rgba(184,147,77,.08)}
+.lang-btn:active{transform:scale(.94)}
+.lang-btn.active{color:#fff;background:var(--gold);border-color:var(--gold);box-shadow:0 1px 3px rgba(184,147,77,.35),0 0 0 1px rgba(184,147,77,.20);text-shadow:0 1px 0 rgba(0,0,0,.08)}
+.lang-btn.active:hover{background:#a67f3c;border-color:#a67f3c;color:#fff}
+.lang-btn:focus-visible{outline:2px solid var(--gold-2);outline-offset:2px}
+.win-card{text-align:center}
+.win-icon{width:72px;height:72px;margin:0 auto 16px;border-radius:50%;background:var(--sage-bg);color:var(--sage);display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 8px rgba(74,107,74,.08);animation:winIcon .8s var(--ease-spring) both}
+@keyframes winIcon{0%{transform:scale(0);opacity:0}60%{transform:scale(1.15)}100%{transform:scale(1);opacity:1}}
+.win-card h2{font-size:26px;text-align:center;margin-bottom:6px}
+.win-card .sub{text-align:center;margin-bottom:16px}
+
+/* --- Medalla --- */
+.win-medal{
+  display:inline-flex;align-items:center;gap:8px;
+  padding:6px 14px;margin:0 auto 16px;border-radius:999px;
+  font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.06em;
+  text-transform:uppercase;
+  animation:medalIn .6s var(--ease-spring) both;
+}
+@keyframes medalIn{
+  0%{transform:scale(0) rotate(-90deg);opacity:0}
+  60%{transform:scale(1.12) rotate(6deg)}
+  100%{transform:scale(1) rotate(0);opacity:1}
+}
+.win-medal[hidden]{display:none}
+.win-medal svg{width:16px;height:16px}
+.win-medal.gold{background:var(--gold-bg);color:var(--gold);box-shadow:0 0 0 1px rgba(184,147,77,.30)}
+.win-medal.silver{background:var(--silver-bg);color:var(--silver);box-shadow:0 0 0 1px rgba(155,163,168,.35)}
+.win-medal.bronze{background:var(--bronze-bg);color:var(--bronze);box-shadow:0 0 0 1px rgba(169,122,82,.35)}
+
+/* --- Puntuación --- */
+.win-score{
+  background:linear-gradient(180deg,var(--paper-2) 0%,var(--paper) 100%);
+  border-radius:var(--r-lg);
+  padding:16px 12px 12px;
+  margin-bottom:18px;
+  border:1px solid var(--line);
+}
+.win-score .v{
+  font-family:var(--mono);font-size:38px;font-weight:700;
+  color:var(--gold);font-variant-numeric:tabular-nums;
+  letter-spacing:.02em;line-height:1;
+  text-shadow:0 1px 0 rgba(255,255,255,.4);
+}
+.win-score .l{
+  font-size:10px;color:var(--ink-3);text-transform:uppercase;
+  letter-spacing:.10em;font-weight:700;margin-top:6px;
+}
+.win-score .rec{
+  font-size:11px;color:var(--ink-3);margin-top:8px;letter-spacing:.02em;
+  font-family:var(--mono);
+}
+.win-score .rec.new{
+  color:var(--gold);font-weight:700;
+  animation:recordPulse .8s var(--ease-spring) both;
+}
+@keyframes recordPulse{
+  0%{transform:scale(.9);opacity:0}
+  50%{transform:scale(1.06);opacity:1}
+  100%{transform:scale(1);opacity:1}
+}
+
+.win-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:22px}
+.win-stat{background:var(--paper-2);border-radius:var(--r-md);padding:14px 6px;display:flex;flex-direction:column;align-items:center;gap:3px}
+.win-stat .v{font-family:var(--mono);font-size:18px;font-weight:600;color:var(--ink);font-variant-numeric:tabular-nums;letter-spacing:.02em}
+.win-stat .l{font-size:10px;color:var(--ink-3);text-transform:uppercase;letter-spacing:.08em;font-weight:600}
+
+.confirm-card{text-align:center;max-width:340px}
+.confirm-card .warn-icon{width:56px;height:56px;margin:0 auto 14px;border-radius:50%;background:var(--terra-bg);color:var(--terra);display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 6px rgba(184,96,76,.08)}
+.confirm-card h2{text-align:center}
+.confirm-card .sub{text-align:center;margin-bottom:20px}
+.confirm-card .menu-actions{margin-bottom:0}
+.tut-list{list-style:none;margin:0 0 22px;padding:0;display:flex;flex-direction:column;gap:14px}
+.tut-list li{display:grid;grid-template-columns:26px 1fr;gap:10px;font-size:13.5px;color:var(--ink-2);line-height:1.55}
+.tut-list li b{color:var(--ink);font-weight:600}
+.tut-list .n{width:26px;height:26px;border-radius:50%;background:var(--gold-bg);color:var(--gold);font-family:var(--serif);font-size:14px;font-weight:600;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.toast{position:fixed;bottom:calc(env(safe-area-inset-bottom) + 148px);left:50%;transform:translate(-50%,20px);background:var(--ink);color:var(--cream);padding:10px 20px;border-radius:24px;font-size:13px;font-weight:500;box-shadow:var(--sh-lg);opacity:0;transition:opacity .3s ease,transform .3s var(--ease-spring);pointer-events:none;z-index:200;max-width:88%;text-align:center;letter-spacing:.01em;line-height:1.4}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+.confetti{position:fixed;inset:0;pointer-events:none;z-index:150;overflow:hidden}
+.confetti i{position:absolute;top:-12px;width:7px;height:11px;border-radius:2px;opacity:0;animation:caer linear forwards}
+@keyframes caer{0%{transform:translateY(0) rotate(0);opacity:1}100%{transform:translateY(105vh) rotate(var(--rx,360deg));opacity:0}}
+@media (max-height:640px){
+  .brand{font-size:20px}.timer{font-size:12px;padding:4px 10px;min-width:52px}
+  .key{min-height:46px;font-size:20px;padding:6px 4px 4px}
+  .action-btn{min-height:34px;font-size:10px;padding:6px 2px}
+  .topbar{padding:8px 14px 4px}.board{grid-template-rows:20px repeat(9,minmax(0,1fr));gap:3px}
+  .board-head{gap:3px}.cell{border-radius:6px}.cell .notes-grid{font-size:8px}
+  .win-score .v{font-size:32px}
+}
+@media (max-height:560px){
+  .key{min-height:42px;font-size:18px;padding:4px 4px 2px}.cell{font-size:17px}
+  .board{gap:3px;grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) 36px}
+  .board-head{grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) 36px}
+  .col-head .pip{font-size:8px;height:12px;line-height:12px}
+  .row-sum{font-size:10px;height:20px;min-width:34px;padding:0 5px}
+}
+@media (max-width:360px){
+  .col-head .pip{font-size:8px}.board{padding:0 4px}.key{font-size:19px}
+  .action-strip{gap:4px;padding:0 8px}
+  .action-btn{font-size:9px;gap:3px;padding:6px 1px;min-height:34px}
+  .action-btn svg{width:12px;height:12px}
+  .action-btn .badge{font-size:7.5px;padding:0 3px;min-width:12px}
+  .lang-picker{padding:2px}.lang-btn{min-width:32px;height:24px;padding:0 7px;font-size:10px;letter-spacing:.04em}
+}
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{animation-duration:.001ms !important;animation-iteration-count:1 !important;transition-duration:.001ms !important;scroll-behavior:auto !important}
+  .cell.pop,.cell.hint-pop,.cell.clear-pop,.cell.wrong-pop,.row-sum.ok,.win-icon,.win-medal,
+  .action-btn.badge-pulse .badge,.win-score .rec.new{animation:none !important}
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --cream:#1c1a16;--cream-2:#252220;--paper:#232019;--paper-2:#2b271f;
+    --ink:#ebe2cf;--ink-2:#a99e88;--ink-3:#7a6f5c;--ink-4:#4a4234;
+    --line:#3a3327;--line-2:#4a4234;
+    --gold:#d4b478;--gold-2:#b8934d;--gold-bg:#332b1c;
+    --sage:#8fae8f;--sage-2:#7d9a7d;--sage-bg:#1f2a1f;
+    --terra:#d68070;--terra-bg:#2e1f1b;
+    --silver:#adb5ba;--silver-bg:#282c2e;
+    --bronze:#c69770;--bronze-bg:#2e251d;
+    --sh-sm:0 1px 2px rgba(0,0,0,.4);
+    --sh-md:0 2px 8px rgba(0,0,0,.5),0 1px 3px rgba(0,0,0,.4);
+    --sh-lg:0 8px 24px rgba(0,0,0,.55),0 2px 6px rgba(0,0,0,.4);
+    --sh-xl:0 20px 48px rgba(0,0,0,.7),0 4px 12px rgba(0,0,0,.5);
+  }
+  body{background:radial-gradient(ellipse 120% 60% at 50% -10%,#2b2620 0%,transparent 60%),radial-gradient(ellipse 90% 50% at 50% 110%,#17140e 0%,transparent 55%),var(--cream)}
+  body:before{opacity:.2}
+  .timer{background:rgba(212,180,120,.10);border-color:rgba(212,180,120,.28);color:var(--ink)}
+  .cell.selected{background:#3a3226;color:var(--gold);border-color:var(--gold);box-shadow:0 0 0 2px rgba(212,180,120,.30),0 0 0 1px var(--gold),0 4px 14px rgba(0,0,0,.55)}
+  .cell.selected.clue{border-color:var(--gold);box-shadow:0 0 0 2px rgba(212,180,120,.35),0 4px 14px rgba(0,0,0,.55)}
+  .cell.selected.wrong{border-color:var(--terra);color:var(--terra);box-shadow:0 0 0 2px rgba(214,128,112,.35),0 4px 14px rgba(0,0,0,.55)}
+  .cell.same-row,.cell.same-col{background:rgba(212,180,120,.07)}
+  .cell.same-row.filled,.cell.same-col.filled{background:rgba(143,174,143,.10)}
+  .cell.same-row.wrong,.cell.same-col.wrong{background:rgba(214,128,112,.12);color:var(--terra)}
+  .cell.same-row.clue,.cell.same-col.clue{background:rgba(212,180,120,.12)}
+  .cell.wrong{background:rgba(214,128,112,.14);color:var(--terra);box-shadow:inset 0 0 0 1px rgba(214,128,112,.28),var(--sh-sm)}
+  .action-btn:hover:not(:disabled),.key:hover:not(:disabled),.diff-btn:hover,.btn-ghost:hover,.lang-btn:hover{background:#2f2a20}
+  .lang-picker{background:#1f1c17;box-shadow:inset 0 1px 2px rgba(0,0,0,.35)}
+  .lang-btn.active{color:#1c1a16;text-shadow:none}
+  .lang-btn.active:hover{color:#1c1a16}
+  .win-score{background:linear-gradient(180deg,#28241b 0%,#232019 100%)}
+  .win-score .v{text-shadow:none}
+}
+</style>
 </head>
 <body>
-    <div class="container">
-        <header>
-            <div class="logo-container">
-                <div class="logo-shape">
-                    <div class="logo-inner">SZ+</div>
-                </div>
-                <h1 class="logo-text">SHUMZU+</h1>
-            </div>
-            <p class="tagline">Compatible con shumzuX.py • Escaneo Ultra Rápido</p>
-            <button id="theme-toggle" class="theme-toggle">🌙</button>
-        </header>
+<div class="app" id="app">
+  <header class="topbar">
+    <div class="brand"><span class="dot"></span>Blottoku</div>
+    <div class="top-right">
+      <span class="timer" id="timer">0:00</span>
+      <button class="icon-btn" id="sound-btn" aria-label="Sound">
+        <svg id="sound-on-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+          <path d="M15.5 8.5a5 5 0 0 1 0 7"/>
+          <path d="M18.5 5.5a9 9 0 0 1 0 13"/>
+        </svg>
+        <svg id="sound-off-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none">
+          <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+          <line x1="22" y1="9" x2="16" y2="15"/>
+          <line x1="16" y1="9" x2="22" y2="15"/>
+        </svg>
+      </button>
+      <button class="icon-btn" id="menu-btn" aria-label="Menu">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="4" y1="7" x2="20" y2="7"/>
+          <line x1="4" y1="12" x2="20" y2="12"/>
+          <line x1="4" y1="17" x2="20" y2="17"/>
+        </svg>
+      </button>
+    </div>
+  </header>
 
-        <main class="main-content">
-            <!-- Sección de Modo -->
-            <section class="mode-section">
-                <div class="mode-selector">
-                    <button id="mode-scan" class="mode-btn active">📱 Escanear QR</button>
-                    <button id="mode-generate" class="mode-btn">⚡ Generar QR</button>
-                </div>
-            </section>
+  <main class="stage">
+    <div class="board" id="board"></div>
+  </main>
 
-            <!-- Sección de Escaneo -->
-            <section id="scan-section" class="scan-section active-section">
-                <h2>Escanear Códigos QR</h2>
-                <div class="scan-options">
-                    <div class="buttons">
-                        <button id="open-camera" class="btn-primary">
-                            <span>📷 Cámara en Tiempo Real</span>
-                            <small>5 FPS • Detección automática</small>
-                        </button>
-                        <button id="upload-files" class="btn-secondary">
-                            <span>📁 Subir Archivos</span>
-                            <small>Imágenes, GIF, Video</small>
-                        </button>
-                        <input type="file" id="file-input" accept="image/*,video/*,.gif" multiple style="display: none;">
-                    </div>
-                    
-                    <div class="scan-modes">
-                        <label class="mode-option">
-                            <input type="checkbox" id="auto-reconstruct" checked>
-                            <span>Reconstruir automáticamente</span>
-                        </label>
-                        <label class="mode-option">
-                            <input type="checkbox" id="ignore-duplicates" checked>
-                            <span>Ignorar duplicados</span>
-                        </label>
-                    </div>
-                </div>
-                
-                <!-- Progreso de escaneo -->
-                <div id="scan-progress-container" class="progress-container enhanced" style="display: none;">
-                    <div class="progress-header">
-                        <h3>Escaneo en progreso</h3>
-                        <span id="scan-progress-percent" class="progress-percent">0%</span>
-                    </div>
-                    <div class="progress-bar">
-                        <div id="scan-progress-fill" class="progress-fill"></div>
-                    </div>
-                    <div class="progress-stats">
-                        <div class="stat-item">
-                            <span class="stat-value" id="scanned-frames">0</span>
-                            <span class="stat-label">Frames</span>
-                        </div>
-                        <div class="stat-item">
-                            <span class="stat-value" id="detected-qrs">0</span>
-                            <span class="stat-label">QR Detectados</span>
-                        </div>
-                        <div class="stat-item">
-                            <span class="stat-value" id="scan-fps">0</span>
-                            <span class="stat-label">FPS</span>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Progreso de reconstrucción -->
-                <div id="reconstruction-progress-container" class="progress-container enhanced" style="display: none;">
-                    <div class="progress-header">
-                        <h3>Reconstruyendo archivo</h3>
-                        <button id="cancel-reconstruction" class="btn-cancel">Cancelar</button>
-                    </div>
-                    <div class="progress-bar">
-                        <div id="reconstruction-progress-fill" class="progress-fill"></div>
-                    </div>
-                    <div id="reconstruction-progress-details" class="progress-details">
-                        <span id="blocks-info">0/0 bloques</span>
-                        <span id="data-size">0 B</span>
-                    </div>
-                    
-                    <div class="block-grid" id="block-grid"></div>
-                    
-                    <div class="reconstruction-stats">
-                        <div class="stat-item">
-                            <span class="stat-label">Compatibilidad:</span>
-                            <span id="compatibility-status" class="stat-value compatible">SHUMZU Python</span>
-                        </div>
-                        <div class="stat-item">
-                            <span class="stat-label">Corrección de errores:</span>
-                            <span id="error-correction-status" class="stat-value">Reed-Solomon activo</span>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Información del archivo -->
-                <div id="file-info" class="file-info" style="display: none;">
-                    <div class="section-header">
-                        <h3>Archivo Detectado</h3>
-                        <button id="show-metadata" class="btn-secondary small">Ver Metadatos</button>
-                    </div>
-                    <div class="file-info-grid">
-                        <div class="file-info-item">
-                            <div class="file-info-label">📄 Nombre:</div>
-                            <div id="info-name" class="file-info-value">-</div>
-                        </div>
-                        <div class="file-info-item">
-                            <div class="file-info-label">📦 Tamaño:</div>
-                            <div id="info-size" class="file-info-value">-</div>
-                        </div>
-                        <div class="file-info-item">
-                            <div class="file-info-label">🧩 Bloques:</div>
-                            <div id="info-blocks" class="file-info-value">-</div>
-                        </div>
-                        <div class="file-info-item">
-                            <div class="file-info-label">🔐 Estado:</div>
-                            <div id="info-encryption" class="file-info-value">-</div>
-                        </div>
-                        <div class="file-info-item">
-                            <div class="file-info-label">📅 Fecha:</div>
-                            <div id="info-date" class="file-info-value">-</div>
-                        </div>
-                        <div class="file-info-item">
-                            <div class="file-info-label">✅ Hash:</div>
-                            <div id="info-hash" class="file-info-value hash-display">-</div>
-                        </div>
-                    </div>
-                    
-                    <div class="action-buttons">
-                        <button id="reconstruct-btn" class="btn-reconstruct" style="display: none;">
-                            <span>🔧 Reconstruir Archivo</span>
-                        </button>
-                        <button id="export-data" class="btn-secondary small">💾 Exportar Datos</button>
-                    </div>
-                </div>
-            </section>
-
-            <!-- Sección de Generación -->
-            <section id="generate-section" class="generate-section" style="display: none;">
-                <h2>Generar Códigos QR</h2>
-                
-                <div class="file-upload-area">
-                    <div class="upload-area" id="drop-zone">
-                        <div class="upload-icon">📁</div>
-                        <p><strong>Arrastra y suelta archivos aquí</strong></p>
-                        <p class="upload-subtext">o haz clic para seleccionar (máx. 50MB)</p>
-                        <p class="upload-subtext" style="font-size: 0.8rem; margin-top: 10px;">
-                            Formatos soportados: PDF, imágenes (JPG, PNG, GIF), texto, documentos de Office, ZIP, JSON, XML
-                        </p>
-                        <input type="file" id="generate-file-input" style="display: none;">
-                    </div>
-                    
-                    <div id="selected-file-info" class="selected-file-info" style="display: none;">
-                        <!-- Se llenará dinámicamente -->
-                    </div>
-                </div>
-                
-                <div class="generate-options">
-                    <div class="option-group">
-                        <label for="qr-quality">Calidad de corrección:</label>
-                        <select id="qr-quality">
-                            <option value="L">Baja (7%)</option>
-                            <option value="M" selected>Media (15%)</option>
-                            <option value="Q">Alta (25%)</option>
-                            <option value="H">Máxima (30%)</option>
-                        </select>
-                    </div>
-                    
-                    <div class="option-group">
-                        <label for="block-size">Tamaño de bloque:</label>
-                        <select id="block-size">
-                            <option value="512">512 bytes</option>
-                            <option value="1024" selected>1 KB</option>
-                            <option value="2048">2 KB</option>
-                            <option value="4096">4 KB</option>
-                        </select>
-                    </div>
-                    
-                    <div class="option-group">
-                        <label for="frame-delay">Delay entre QR (ms):</label>
-                        <select id="frame-delay">
-                            <option value="200">200ms (Rápido)</option>
-                            <option value="500" selected>500ms (Normal)</option>
-                            <option value="1000">1000ms (Lento)</option>
-                            <option value="2000">2000ms (Muy lento)</option>
-                        </select>
-                    </div>
-                    
-                    <div class="option-group">
-                        <label for="encryption-toggle">
-                            <input type="checkbox" id="encryption-toggle">
-                            <span>🔒 Habilitar cifrado AES-256</span>
-                        </label>
-                        <div id="encryption-options" style="display: none; margin-top: 15px; padding: 15px; background: rgba(0,0,0,0.03); border-radius: 8px;">
-                            <div style="margin-bottom: 10px;">
-                                <input type="password" id="encryption-password" placeholder="Contraseña (mín. 8 caracteres)" style="width: 100%; padding: 10px;">
-                            </div>
-                            <div>
-                                <input type="password" id="encryption-confirm" placeholder="Confirmar contraseña" style="width: 100%; padding: 10px;">
-                            </div>
-                            <p style="font-size: 0.8rem; color: #666; margin-top: 10px;">
-                                🔐 La contraseña se usará para cifrar cada bloque con AES-256 GCM
-                            </p>
-                        </div>
-                    </div>
-                    
-                    <div class="option-group">
-                        <label for="output-format">Formato de salida:</label>
-                        <select id="output-format">
-                            <option value="gif">GIF Animado</option>
-                            <option value="zip" selected>ZIP con imágenes PNG</option>
-                            <option value="both">Ambos formatos</option>
-                        </select>
-                    </div>
-                    
-                    <div class="option-group">
-                        <label for="compression-toggle">
-                            <input type="checkbox" id="compression-toggle" checked>
-                            <span>🗜️ Comprimir datos</span>
-                        </label>
-                    </div>
-                </div>
-                
-                <div class="generation-progress" style="display: none;">
-                    <div class="progress-header">
-                        <h3>Generando códigos QR</h3>
-                        <span id="generation-progress-percent" class="progress-percent">0%</span>
-                    </div>
-                    <div class="progress-bar">
-                        <div id="generation-progress-fill" class="progress-fill"></div>
-                    </div>
-                    <div class="progress-details">
-                        <span id="generation-status">Preparando...</span>
-                        <span id="qr-count">0/0 códigos</span>
-                    </div>
-                    <div class="block-grid" id="generation-block-grid"></div>
-                </div>
-                
-                <div class="qr-preview-container">
-                    <div class="section-header">
-                        <h3>Vista previa</h3>
-                        <div class="preview-controls">
-                            <button id="prev-qr" class="btn-secondary small" disabled>← Anterior</button>
-                            <span id="current-qr-index">0/0</span>
-                            <button id="next-qr" class="btn-secondary small" disabled>Siguiente →</button>
-                        </div>
-                    </div>
-                    <div class="qr-preview" id="qr-preview">
-                        <canvas id="qr-canvas-preview" width="300" height="300"></canvas>
-                        <div class="qr-info">
-                            <div class="qr-type" id="qr-type">Tipo: -</div>
-                            <div class="qr-size" id="qr-data-size">Datos: -</div>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="action-buttons">
-                    <button id="generate-qr" class="btn-primary" disabled>
-                        <span>⚡ Generar Códigos QR</span>
-                    </button>
-                    <button id="download-gif" class="btn-secondary" disabled>
-                        <span>🎬 Descargar GIF</span>
-                    </button>
-                    <button id="download-zip" class="btn-secondary" disabled>
-                        <span>📦 Descargar ZIP</span>
-                    </button>
-                    <button id="reset-generation" class="btn-cancel">
-                        <span>🗑️ Limpiar</span>
-                    </button>
-                </div>
-            </section>
-
-            <!-- Historial -->
-            <section class="history-section">
-                <div class="section-header">
-                    <h2>Historial de Actividad</h2>
-                    <div class="history-filters">
-                        <button id="filter-all" class="filter-btn active">Todo</button>
-                        <button id="filter-scans" class="filter-btn">Escaneos</button>
-                        <button id="filter-generations" class="filter-btn">Generaciones</button>
-                    </div>
-                </div>
-                <div id="history-list" class="history-list">
-                    <p class="no-history">No hay actividad reciente</p>
-                </div>
-            </section>
-        </main>
+  <section class="bottom">
+    <div class="action-strip">
+      <button class="action-btn" id="undo-btn" disabled aria-label="Undo">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/>
+        </svg>
+      </button>
+      <button class="action-btn" id="hint-btn">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M9 18h6"/><path d="M10 22h4"/><path d="M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2z"/>
+        </svg>
+        <span data-i18n="hint">Hint</span>
+        <span class="badge" id="hint-badge">3</span>
+      </button>
+      <button class="action-btn" id="check-btn">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="20 6 9 17 4 12"/>
+        </svg>
+        <span data-i18n="check">Check</span>
+        <span class="badge" id="check-badge">3</span>
+      </button>
+      <button class="action-btn" id="notes-btn" aria-label="Notes mode">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 20h9"/>
+          <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
+        </svg>
+      </button>
+      <button class="action-btn" id="restart-btn" aria-label="Restart">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 12a9 9 0 1 0 9-9"/><path d="M3 3v6h6"/>
+        </svg>
+      </button>
     </div>
 
-    <!-- Modal de Cámara -->
-    <div id="camera-modal" class="modal">
-        <div class="modal-content">
-            <button id="close-modal" class="close-btn">&times;</button>
-            <h2>Escanear QR en Tiempo Real</h2>
-            <p class="scan-help">Apunte la cámara a los códigos QR. La detección es automática.</p>
-            
-            <div class="camera-container">
-                <div class="camera-wrapper">
-                    <video id="camera-stream" playsinline autoplay></video>
-                    <div class="scan-overlay">
-                        <div class="scan-grid">
-                            <!-- Celdas generadas dinámicamente -->
-                        </div>
-                        <div class="scan-guide"></div>
-                    </div>
-                    <div id="scan-feedback" class="scan-feedback"></div>
-                </div>
-                
-                <div class="scan-statistics">
-                    <div class="stat-item">
-                        <div id="total-scanned" class="stat-value">0</div>
-                        <div class="stat-label">Total QR</div>
-                    </div>
-                    <div class="stat-item">
-                        <div id="unique-blocks" class="stat-value">0</div>
-                        <div class="stat-label">Bloques únicos</div>
-                    </div>
-                    <div class="stat-item">
-                        <div id="scan-speed" class="stat-value">0</div>
-                        <div class="stat-label">QR/seg</div>
-                    </div>
-                    <div class="stat-item">
-                        <div id="scan-resolution" class="stat-value">-</div>
-                        <div class="stat-label">Resolución</div>
-                    </div>
-                </div>
-                
-                <div class="modal-actions">
-                    <button id="pause-scan" class="btn-secondary">⏸️ Pausar</button>
-                    <button id="resume-scan" class="btn-secondary" style="display: none;">▶️ Reanudar</button>
-                    <button id="save-scan" class="btn-primary">💾 Guardar Progreso</button>
-                </div>
-            </div>
+    <div class="keypad" id="keypad"></div>
+  </section>
+</div>
+
+<!-- Overlay: menú -->
+<div class="overlay" id="menu-overlay">
+  <div class="card">
+    <h2 data-i18n="menu_title">New puzzle</h2>
+    <div class="sub" data-i18n="menu_sub"></div>
+    <div class="diff-grid" id="diff-grid">
+      <button class="diff-btn" data-diff="facil">
+        <span class="n" data-i18n="diff_easy"></span>
+        <span class="c" data-diff-info="facil"></span>
+      </button>
+      <button class="diff-btn active" data-diff="medio">
+        <span class="n" data-i18n="diff_medium"></span>
+        <span class="c" data-diff-info="medio"></span>
+      </button>
+      <button class="diff-btn" data-diff="dificil">
+        <span class="n" data-i18n="diff_hard"></span>
+        <span class="c" data-diff-info="dificil"></span>
+      </button>
+      <button class="diff-btn" data-diff="experto">
+        <span class="n" data-i18n="diff_expert"></span>
+        <span class="c" data-diff-info="experto"></span>
+      </button>
+    </div>
+    <div class="menu-actions">
+      <button class="btn btn-ghost" id="menu-cancel" data-i18n="cancel"></button>
+      <button class="btn btn-primary" id="menu-start" data-i18n="start"></button>
+    </div>
+    <div class="menu-foot">
+      <div class="menu-foot-row">
+        <a id="menu-help" data-i18n="how_to_play"></a>
+        <div class="lang-picker" id="lang-picker" role="group" aria-label="Idioma / Language">
+          <button class="lang-btn" data-lang="en" title="English" aria-label="English">EN</button>
+          <button class="lang-btn" data-lang="ca" title="Català" aria-label="Català">CA</button>
+          <button class="lang-btn" data-lang="es" title="Español" aria-label="Español">ES</button>
+          <button class="lang-btn" data-lang="fr" title="Français" aria-label="Français">FR</button>
         </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Overlay: confirmación de reinicio -->
+<div class="overlay" id="confirm-overlay">
+  <div class="card confirm-card">
+    <div class="warn-icon">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M3 12a9 9 0 1 0 9-9"/>
+        <path d="M3 3v6h6"/>
+      </svg>
+    </div>
+    <h2 data-i18n="confirm_restart_title"></h2>
+    <div class="sub" data-i18n="confirm_restart_msg"></div>
+    <div class="menu-actions">
+      <button class="btn btn-ghost" id="confirm-no" data-i18n="confirm_no"></button>
+      <button class="btn btn-danger" id="confirm-yes" data-i18n="confirm_yes"></button>
+    </div>
+  </div>
+</div>
+
+<!-- Overlay: victoria -->
+<div class="overlay" id="win-overlay">
+  <div class="card win-card">
+    <div class="win-icon">
+      <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="20 6 9 17 4 12"/>
+      </svg>
+    </div>
+    <h2 data-i18n="solved"></h2>
+    <div class="sub" id="win-sub"></div>
+
+    <div class="win-medal" id="win-medal" hidden>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="12" cy="9" r="6"/>
+        <path d="M8.5 14.2 6 22l6-3 6 3-2.5-7.8"/>
+      </svg>
+      <span id="win-medal-label"></span>
     </div>
 
-    <!-- Modal de Contraseña -->
-    <div id="password-modal" class="modal">
-        <div class="modal-content">
-            <button id="close-password-modal" class="close-btn">&times;</button>
-            <h2>Archivo Cifrado</h2>
-            <p>Este archivo fue cifrado con shumzuX.py. Introduzca la contraseña para continuar.</p>
-            <div class="password-input-group">
-                <input type="password" id="password-input" placeholder="Contraseña usada en Python" autocomplete="current-password">
-                <button id="toggle-password" class="btn-eye">👁️</button>
-            </div>
-            <p class="password-hint">Nota: Use la misma contraseña que usó con shumzuX.py</p>
-            <div class="modal-buttons">
-                <button id="confirm-password" class="btn-primary">Descifrar</button>
-                <button id="cancel-password" class="btn-secondary">Cancelar</button>
-            </div>
-        </div>
+    <div class="win-score">
+      <div class="v" id="win-score">0</div>
+      <div class="l" data-i18n="score"></div>
+      <div class="rec" id="win-record"></div>
     </div>
 
-    <!-- Modal de Metadatos -->
-    <div id="metadata-modal" class="modal">
-        <div class="modal-content">
-            <button id="close-metadata-modal" class="close-btn">&times;</button>
-            <h2>Metadatos del Archivo</h2>
-            <div id="metadata-content" class="metadata-content"></div>
-        </div>
+    <div class="win-stats">
+      <div class="win-stat"><span class="v" id="win-time">0:00</span><span class="l" data-i18n="time"></span></div>
+      <div class="win-stat"><span class="v" id="win-moves">0</span><span class="l" data-i18n="moves"></span></div>
+      <div class="win-stat"><span class="v" id="win-helps">0</span><span class="l" data-i18n="helps"></span></div>
     </div>
+    <button class="btn btn-primary" id="win-new" data-i18n="another_puzzle"></button>
+  </div>
+</div>
 
-    <!-- Scripts propios -->
-    <script src="reed-solomon.js"></script>
-    <script src="shumzu-compat.js"></script>
-    <script src="script.js"></script>
+<!-- Overlay: tutorial -->
+<div class="overlay" id="tut-overlay">
+  <div class="card">
+    <h2 data-i18n="tut_title"></h2>
+    <div class="sub" data-i18n="tut_sub"></div>
+    <ol class="tut-list">
+      <li><span class="n">1</span><span data-i18n-html="tut_1"></span></li>
+      <li><span class="n">2</span><span data-i18n-html="tut_2"></span></li>
+      <li><span class="n">3</span><span data-i18n-html="tut_3"></span></li>
+    </ol>
+    <button class="btn btn-primary" id="tut-ok" data-i18n="understood"></button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="core.js"></script>
+<script>
+'use strict';
+
+/* ==========================================================================
+   i18n
+   ========================================================================== */
+const I18N = {
+  LANGS: ['en', 'ca', 'es', 'fr'],
+  DEFAULT: 'en',
+  lang: 'en',
+  dict: {
+    en: {
+      menu_title: 'New puzzle',
+      menu_sub: 'Choose difficulty. Fewer clues, more deduction.',
+      diff_easy: 'Easy', diff_medium: 'Medium', diff_hard: 'Hard', diff_expert: 'Expert',
+      diff_info: '{pistas} clues · {ayudas} hints · {checks} checks · {base} pts',
+      cancel: 'Cancel', start: 'Start', how_to_play: 'How to play',
+      solved: 'Solved', puzzle_completed: 'Puzzle completed',
+      time: 'Time', moves: 'Moves', helps: 'Helps', score: 'Score', another_puzzle: 'Another puzzle',
+      no_help: 'No helps · Perfect',
+      one_hint: 'With one help',
+      n_hints: 'With {n} helps',
+      medal_gold: 'Gold', medal_silver: 'Silver', medal_bronze: 'Bronze',
+      record_beat: '★ New record',
+      record_best: 'Best: {n}',
+      tut_title: 'How to play',
+      tut_sub: 'Three rules, all at once. It is solved by deduction, not by trial.',
+      tut_1: '<b>Each row sums 12.</b> The indicator on the right shows your progress: when it reaches 12/12, it turns green.',
+      tut_2: '<b>Each column uses 0–8 without repeats.</b> The dots up top get crossed off as numbers appear.',
+      tut_3: '<b>Everything is deduced.</b> The keypad disables impossible numbers. <b>Hint</b> reveals an empty cell. <b>Check</b> locks a placed digit or flags a wrong one in red. Each help costs points — every level has its own record.',
+      understood: 'Got it',
+      undo: 'Undo', hint: 'Hint', check: 'Check', notes: 'Notes', restart: 'Restart',
+      toast_gen_fail: 'Could not generate · retrying',
+      toast_clean: 'Board cleared · back to the initial clues',
+      toast_notes_on: 'Notes mode · mark candidates',
+      toast_cant_place: 'That number can\'t go here',
+      toast_no_hints: 'No hints left on {diff}',
+      toast_no_checks: 'No checks left on {diff}',
+      toast_check_none: 'No numbers to inspect yet',
+      toast_check_trivial: 'Those cells are already deducible · nothing else to flag',
+      toast_check_red: 'One of your numbers is wrong · flagged in red',
+      toast_check_red_remaining: ' · {n} of {max} left',
+      toast_check_red_last: ' · that was the last one',
+      toast_board_ok: 'The board is already correct',
+      toast_board_incorrect: 'There are cells that break the rules · check the red rows',
+      toast_hint_placed: 'The {v} goes here · {reason}',
+      toast_hint_remaining: ' · {n} of {max} left',
+      toast_hint_last: ' · that was the last one',
+      toast_hint_cleared: ' · {n} conflict(s) cleared',
+      toast_check_placed: 'Locked the {v} · it was correct',
+      toast_check_remaining: ' · {n} of {max} left',
+      toast_check_last: ' · that was the last one',
+      exp_col: 'it is the only one of 0–8 missing from the column.',
+      exp_row: 'the row already sums {sum}, so only {rem} can go here.',
+      exp_only: 'no other number fits here.',
+      exp_deduce: 'by elimination in the row and column.',
+      confirm_restart_title: 'Restart the puzzle?',
+      confirm_restart_msg: 'Your moves will be cleared and the hints and checks you used will be restored.',
+      confirm_yes: 'Restart',
+      confirm_no: 'Cancel',
+      aria_sound: 'Sound', aria_menu: 'Menu', aria_undo: 'Undo',
+      aria_notes: 'Notes mode', aria_restart: 'Restart puzzle', aria_erase: 'Erase',
+      aria_hint_avail: 'Hint ({n} available)',
+      aria_hint_none: 'No hints available',
+      aria_check_avail: 'Check ({n} available)',
+      aria_check_none: 'No checks available',
+      aria_row_col: 'Row {r}, column {c}'
+    },
+    ca: {
+      menu_title: 'Nou puzzle',
+      menu_sub: 'Tria la dificultat. Menys pistes, més deducció.',
+      diff_easy: 'Fàcil', diff_medium: 'Mitjà', diff_hard: 'Difícil', diff_expert: 'Expert',
+      diff_info: '{pistas} pistes · {ayudas} ajudes · {checks} comprovacions · {base} pts',
+      cancel: 'Cancel·lar', start: 'Comença', how_to_play: 'Com es juga',
+      solved: 'Resolt', puzzle_completed: 'Puzzle completat',
+      time: 'Temps', moves: 'Jugades', helps: 'Ajudes', score: 'Puntuació', another_puzzle: 'Un altre puzzle',
+      no_help: 'Sense ajudes · Perfecte',
+      one_hint: 'Amb una ajuda',
+      n_hints: 'Amb {n} ajudes',
+      medal_gold: 'Or', medal_silver: 'Plata', medal_bronze: 'Bronze',
+      record_beat: '★ Nou rècord',
+      record_best: 'Millor: {n}',
+      tut_title: 'Com es juga',
+      tut_sub: 'Tres regles, totes alhora. Es resol deduint, no provant.',
+      tut_1: '<b>Cada fila suma 12.</b> L\'indicador de la dreta et diu el progrés en cada moment: quan arriba a 12/12, es posa verd.',
+      tut_2: '<b>Cada columna fa servir 0–8 sense repetir.</b> Els puntets de dalt es van ratllant sols a mesura que apareix cada número.',
+      tut_3: '<b>Tot es dedueix.</b> El teclat apaga els números impossibles. <b>Ajuda</b> revela una casella buida. <b>Comprova</b> fixa un número col·locat o marca en vermell un d\'incorrecte. Cada ajuda costa punts — cada nivell té el seu rècord.',
+      understood: 'Entès',
+      undo: 'Desfer', hint: 'Ajuda', check: 'Comprova', notes: 'Notes', restart: 'Reiniciar',
+      toast_gen_fail: 'No s\'ha pogut generar · reintentant',
+      toast_clean: 'Tauler net · tornes a les pistes inicials',
+      toast_notes_on: 'Mode notes · apunta candidats',
+      toast_cant_place: 'Aquest número no pot anar aquí',
+      toast_no_hints: 'Sense ajudes disponibles a {diff}',
+      toast_no_checks: 'Sense comprovacions disponibles a {diff}',
+      toast_check_none: 'Encara no hi ha cap número per revisar',
+      toast_check_trivial: 'Aquestes caselles ja es dedueixen soles · no hi ha res més a marcar',
+      toast_check_red: 'Un dels teus números està malament · marcat en vermell',
+      toast_check_red_remaining: ' · queden {n} de {max}',
+      toast_check_red_last: ' · era l\'última',
+      toast_board_ok: 'El tauler ja està bé',
+      toast_board_incorrect: 'Hi ha caselles que trenquen les regles · revisa les files vermelles',
+      toast_hint_placed: 'El {v} va aquí · {reason}',
+      toast_hint_remaining: ' · queden {n} de {max}',
+      toast_hint_last: ' · era l\'última',
+      toast_hint_cleared: ' · {n} conflicte(s) esborrat(s)',
+      toast_check_placed: 'Fixat el {v} · era correcte',
+      toast_check_remaining: ' · queden {n} de {max}',
+      toast_check_last: ' · era l\'última',
+      exp_col: 'és l\'únic de 0–8 que falta a la columna.',
+      exp_row: 'la fila ja suma {sum}, així que aquí només queda {rem}.',
+      exp_only: 'no hi cap cap altre número.',
+      exp_deduce: 'per descart en la fila i la columna.',
+      confirm_restart_title: 'Reiniciar el puzzle?',
+      confirm_restart_msg: 'Esborraràs les teves jugades i recuperaràs les ajudes i comprovacions gastades.',
+      confirm_yes: 'Reiniciar',
+      confirm_no: 'Cancel·lar',
+      aria_sound: 'So', aria_menu: 'Menú', aria_undo: 'Desfer',
+      aria_notes: 'Mode notes', aria_restart: 'Reiniciar puzzle', aria_erase: 'Esborrar',
+      aria_hint_avail: 'Ajuda ({n} disponibles)',
+      aria_hint_none: 'Sense ajudes disponibles',
+      aria_check_avail: 'Comprovació ({n} disponibles)',
+      aria_check_none: 'Sense comprovacions disponibles',
+      aria_row_col: 'Fila {r}, columna {c}'
+    },
+    es: {
+      menu_title: 'Nuevo puzzle',
+      menu_sub: 'Elige la dificultad. Menos pistas, más deducción.',
+      diff_easy: 'Fácil', diff_medium: 'Medio', diff_hard: 'Difícil', diff_expert: 'Experto',
+      diff_info: '{pistas} pistas · {ayudas} ayudas · {checks} checks · {base} pts',
+      cancel: 'Cancelar', start: 'Empezar', how_to_play: 'Cómo se juega',
+      solved: 'Resuelto', puzzle_completed: 'Puzzle completado',
+      time: 'Tiempo', moves: 'Jugadas', helps: 'Ayudas', score: 'Puntuación', another_puzzle: 'Otro puzzle',
+      no_help: 'Sin ayudas · Perfecto',
+      one_hint: 'Con una ayuda',
+      n_hints: 'Con {n} ayudas',
+      medal_gold: 'Oro', medal_silver: 'Plata', medal_bronze: 'Bronce',
+      record_beat: '★ Nuevo récord',
+      record_best: 'Mejor: {n}',
+      tut_title: 'Cómo se juega',
+      tut_sub: 'Tres reglas, todas al mismo tiempo. Se resuelve deduciendo, no probando.',
+      tut_1: '<b>Cada fila suma 12.</b> El indicador a la derecha te dice el progreso en cada momento: cuando llega a 12/12, se pone verde.',
+      tut_2: '<b>Cada columna usa 0–8 sin repetir.</b> Los puntitos de arriba se van tachando solos conforme aparece cada número.',
+      tut_3: '<b>Todo se deduce.</b> El teclado apaga los números imposibles. <b>Ayuda</b> revela una casilla vacía. <b>Check</b> fija un número colocado o marca en rojo uno incorrecto. Cada ayuda cuesta puntos — cada nivel guarda su propio récord.',
+      understood: 'Entendido',
+      undo: 'Deshacer', hint: 'Ayuda', check: 'Check', notes: 'Notas', restart: 'Reiniciar',
+      toast_gen_fail: 'No se pudo generar · reintentando',
+      toast_clean: 'Tablero limpio · vuelves a las pistas iniciales',
+      toast_notes_on: 'Modo notas · apunta candidatos',
+      toast_cant_place: 'Ese número no puede ir aquí',
+      toast_no_hints: 'Sin ayudas disponibles en {diff}',
+      toast_no_checks: 'Sin checks disponibles en {diff}',
+      toast_check_none: 'Todavía no hay ningún número que revisar',
+      toast_check_trivial: 'Esas casillas ya se deducen solas · no hay nada más que marcar',
+      toast_check_red: 'Uno de tus números está mal · marcado en rojo',
+      toast_check_red_remaining: ' · quedan {n} de {max}',
+      toast_check_red_last: ' · era el último',
+      toast_board_ok: 'El tablero ya está bien',
+      toast_board_incorrect: 'Hay celdas que rompen las reglas · revisa las filas en rojo',
+      toast_hint_placed: 'El {v} va aquí · {reason}',
+      toast_hint_remaining: ' · quedan {n} de {max}',
+      toast_hint_last: ' · era la última',
+      toast_hint_cleared: ' · {n} conflicto(s) borrado(s)',
+      toast_check_placed: 'Fijado el {v} · era correcto',
+      toast_check_remaining: ' · quedan {n} de {max}',
+      toast_check_last: ' · era el último',
+      exp_col: 'es el único de 0–8 que falta en la columna.',
+      exp_row: 'la fila ya suma {sum}, así que aquí sólo queda {rem}.',
+      exp_only: 'no cabe ningún otro número aquí.',
+      exp_deduce: 'por descarte en la fila y la columna.',
+      confirm_restart_title: '¿Reiniciar el puzzle?',
+      confirm_restart_msg: 'Se borrarán tus jugadas y las ayudas y checks gastados volverán.',
+      confirm_yes: 'Reiniciar',
+      confirm_no: 'Cancelar',
+      aria_sound: 'Sonido', aria_menu: 'Menú', aria_undo: 'Deshacer',
+      aria_notes: 'Modo notas', aria_restart: 'Reiniciar puzzle', aria_erase: 'Borrar',
+      aria_hint_avail: 'Ayuda ({n} disponibles)',
+      aria_hint_none: 'Sin ayudas disponibles',
+      aria_check_avail: 'Check ({n} disponibles)',
+      aria_check_none: 'Sin checks disponibles',
+      aria_row_col: 'Fila {r}, columna {c}'
+    },
+    fr: {
+      menu_title: 'Nouveau puzzle',
+      menu_sub: 'Choisissez la difficulté. Moins d\'indices, plus de déduction.',
+      diff_easy: 'Facile', diff_medium: 'Moyen', diff_hard: 'Difficile', diff_expert: 'Expert',
+      diff_info: '{pistas} indices · {ayudas} aides · {checks} vérifications · {base} pts',
+      cancel: 'Annuler', start: 'Commencer', how_to_play: 'Comment jouer',
+      solved: 'Résolu', puzzle_completed: 'Puzzle terminé',
+      time: 'Temps', moves: 'Coups', helps: 'Aides', score: 'Score', another_puzzle: 'Un autre puzzle',
+      no_help: 'Sans aide · Parfait',
+      one_hint: 'Avec une aide',
+      n_hints: 'Avec {n} aides',
+      medal_gold: 'Or', medal_silver: 'Argent', medal_bronze: 'Bronze',
+      record_beat: '★ Nouveau record',
+      record_best: 'Meilleur : {n}',
+      tut_title: 'Comment jouer',
+      tut_sub: 'Trois règles, toutes en même temps. On résout par déduction, pas en essayant.',
+      tut_1: '<b>Chaque ligne fait 12.</b> L\'indicateur à droite montre la progression : à 12/12, il devient vert.',
+      tut_2: '<b>Chaque colonne utilise 0–8 sans répétition.</b> Les points en haut se rayent au fur et à mesure.',
+      tut_3: '<b>Tout se déduit.</b> Le clavier désactive les chiffres impossibles. <b>Aide</b> révèle une case vide. <b>Vérifier</b> verrouille un chiffre placé ou signale en rouge un chiffre erroné. Chaque aide coûte des points — chaque niveau garde son record.',
+      understood: 'Compris',
+      undo: 'Annuler', hint: 'Aide', check: 'Vérifier', notes: 'Notes', restart: 'Redémarrer',
+      toast_gen_fail: 'Génération impossible · nouvel essai',
+      toast_clean: 'Plateau nettoyé · retour aux indices initiaux',
+      toast_notes_on: 'Mode notes · notez les candidats',
+      toast_cant_place: 'Ce chiffre ne peut pas aller ici',
+      toast_no_hints: 'Plus d\'aides en {diff}',
+      toast_no_checks: 'Plus de vérifications en {diff}',
+      toast_check_none: 'Aucun chiffre à examiner pour l\'instant',
+      toast_check_trivial: 'Ces cases se déduisent déjà · rien d\'autre à signaler',
+      toast_check_red: 'L\'un de vos chiffres est faux · signalé en rouge',
+      toast_check_red_remaining: ' · {n} sur {max} restants',
+      toast_check_red_last: ' · c\'était le dernier',
+      toast_board_ok: 'Le plateau est déjà correct',
+      toast_board_incorrect: 'Certaines cases violent les règles · vérifiez les lignes rouges',
+      toast_hint_placed: 'Le {v} va ici · {reason}',
+      toast_hint_remaining: ' · {n} sur {max} restants',
+      toast_hint_last: ' · c\'était le dernier',
+      toast_hint_cleared: ' · {n} conflit(s) effacé(s)',
+      toast_check_placed: 'Verrouillé le {v} · il était correct',
+      toast_check_remaining: ' · {n} sur {max} restants',
+      toast_check_last: ' · c\'était le dernier',
+      exp_col: 'c\'est le seul de 0–8 manquant dans la colonne.',
+      exp_row: 'la ligne fait déjà {sum}, il ne reste que {rem} ici.',
+      exp_only: 'aucun autre chiffre ne rentre ici.',
+      exp_deduce: 'par élimination dans la ligne et la colonne.',
+      confirm_restart_title: 'Redémarrer le puzzle ?',
+      confirm_restart_msg: 'Vos coups seront effacés et les aides et vérifications utilisées seront rendues.',
+      confirm_yes: 'Redémarrer',
+      confirm_no: 'Annuler',
+      aria_sound: 'Son', aria_menu: 'Menu', aria_undo: 'Annuler',
+      aria_notes: 'Mode notes', aria_restart: 'Redémarrer le puzzle', aria_erase: 'Effacer',
+      aria_hint_avail: 'Aide ({n} disponibles)',
+      aria_hint_none: 'Aucune aide disponible',
+      aria_check_avail: 'Vérification ({n} disponibles)',
+      aria_check_none: 'Aucune vérification disponible',
+      aria_row_col: 'Ligne {r}, colonne {c}'
+    }
+  },
+  t(key, vars) {
+    const d = this.dict[this.lang] || this.dict[this.DEFAULT];
+    let s = (d && d[key] != null) ? d[key] : (this.dict[this.DEFAULT][key] != null ? this.dict[this.DEFAULT][key] : key);
+    if (vars) for (const k in vars) s = String(s).replace(new RegExp('\\{' + k + '\\}', 'g'), vars[k]);
+    return s;
+  },
+  detect() {
+    try {
+      const n = (navigator.language || navigator.userLanguage || 'en').toLowerCase().split('-')[0];
+      if (this.LANGS.indexOf(n) >= 0) return n;
+    } catch (e) {}
+    return this.DEFAULT;
+  },
+  set(lang) {
+    if (this.LANGS.indexOf(lang) < 0) lang = this.DEFAULT;
+    this.lang = lang;
+    try { document.documentElement.lang = lang; } catch (e) {}
+  }
+};
+
+/* ==========================================================================
+   Alias locales al núcleo
+   ========================================================================== */
+const N_ROWS = BLOTTUKU.FILAS;
+const N_COLS = BLOTTUKU.COLS;
+const TARGET = BLOTTUKU.PRESUPUESTO;
+const DIFFS = BLOTTUKU.DIFICULTADES;
+
+const DIFF_KEY = { facil: 'diff_easy', medio: 'diff_medium', dificil: 'diff_hard', experto: 'diff_expert' };
+function diffName(key) { return I18N.t(DIFF_KEY[key] || 'diff_medium'); }
+
+/* ==========================================================================
+   Puntuación
+   ========================================================================== */
+const SCORE = {
+  HINT_PENALTY:  100,
+  CHECK_PENALTY:  50,
+  NO_HELP_BONUS: 1.20,   // +20 % si terminas sin usar ninguna ayuda
+  calcular(diff, hints, checks) {
+    const base = DIFFS[diff] ? DIFFS[diff].base : 1000;
+    let s = base - this.HINT_PENALTY * hints - this.CHECK_PENALTY * checks;
+    if (s < 0) s = 0;
+    if (hints === 0 && checks === 0) s = Math.round(s * this.NO_HELP_BONUS);
+    return s;
+  },
+  medalla(hints, checks) {
+    const total = hints + checks;
+    if (total === 0) return 'gold';
+    if (total <= 2)  return 'silver';
+    if (total <= 4)  return 'bronze';
+    return null;
+  }
+};
+
+/* ==========================================================================
+   STORE
+   ========================================================================== */
+const STORE = {
+  KEY: 'blottoku-puzzle-v19',
+  SAVE_KEY: 'blottoku-save-v12',
+  load() { try { return JSON.parse(localStorage.getItem(this.KEY) || '{}'); } catch (e) { return {}; } },
+  save(d) { try { localStorage.setItem(this.KEY, JSON.stringify(d)); } catch (e) {} },
+  patch(o) { const d = this.load(); Object.assign(d, o); this.save(d); },
+  addWin(w) {
+    const d = this.load();
+    if (!d.wins) d.wins = [];
+    d.wins.push(w);
+    if (d.wins.length > 200) d.wins = d.wins.slice(-200);
+    this.save(d);
+  },
+  recordOf(diff) {
+    const d = this.load();
+    return (d.records && d.records[diff]) || 0;
+  },
+  saveRecord(diff, score) {
+    const d = this.load();
+    if (!d.records) d.records = {};
+    if ((d.records[diff] || 0) < score) {
+      d.records[diff] = score;
+      this.save(d);
+      return true;   // nuevo récord
+    }
+    return false;
+  },
+  cargarPartida() {
+    try { const s = localStorage.getItem(this.SAVE_KEY); return s ? JSON.parse(s) : null; }
+    catch (e) { return null; }
+  },
+  guardarPartida(obj) {
+    try { localStorage.setItem(this.SAVE_KEY, JSON.stringify(obj)); } catch (e) {}
+  },
+  limpiarPartida() {
+    try { localStorage.removeItem(this.SAVE_KEY); } catch (e) {}
+  }
+};
+
+/* ==========================================================================
+   SONIDO + HÁPTICA
+   ========================================================================== */
+const SOUND = (() => {
+  let ctx = null, enabled = true;
+  function init() {
+    if (!ctx) { try { ctx = new (window.AudioContext || window.webkitAudioContext)(); } catch(e) {} }
+    return ctx;
+  }
+  function play(freq, dur, type, vol) {
+    if (!enabled) return;
+    const c = init(); if (!c) return;
+    if (c.state === 'suspended') c.resume().catch(() => {});
+    const o = c.createOscillator(), g = c.createGain();
+    o.type = type || 'sine';
+    o.frequency.value = freq;
+    g.gain.setValueAtTime(vol || 0.04, c.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, c.currentTime + dur);
+    o.connect(g); g.connect(c.destination);
+    o.start(c.currentTime); o.stop(c.currentTime + dur);
+  }
+  return {
+    isOn() { return enabled; },
+    toggle(v) { enabled = !!v; },
+    buzz(pat) { if (!enabled) return; try { if (navigator.vibrate) navigator.vibrate(pat); } catch(e) {} },
+    select() { play(880, 0.03, 'sine', 0.02); this.buzz(5); },
+    place() { play(587, 0.09, 'sine', 0.05); setTimeout(() => play(880, 0.11, 'sine', 0.04), 50); this.buzz(8); },
+    check() { play(740, 0.1, 'sine', 0.05); setTimeout(() => play(1109, 0.13, 'sine', 0.04), 70); this.buzz([10, 25, 10]); },
+    checkRed() { play(440, 0.11, 'triangle', 0.05); setTimeout(() => play(294, 0.16, 'triangle', 0.045), 80); this.buzz([20, 40, 20]); },
+    clear() { play(392, 0.09, 'sine', 0.03); this.buzz(5); },
+    conflict() { play(330, 0.1, 'triangle', 0.04); setTimeout(() => play(262, 0.14, 'triangle', 0.035), 70); this.buzz([10, 25, 10]); },
+    note() { play(1200, 0.025, 'sine', 0.02); },
+    error() { play(185, 0.16, 'triangle', 0.05); this.buzz([10, 40, 10]); },
+    hint() { play(659, 0.1, 'sine', 0.05); setTimeout(() => play(988, 0.14, 'sine', 0.04), 70); this.buzz([15, 30, 15]); },
+    denied() { play(220, 0.14, 'triangle', 0.04); this.buzz([5, 30, 5]); },
+    win() { [523, 659, 784, 1046].forEach((f, i) => setTimeout(() => play(f, 0.25, 'sine', 0.05), i * 120)); this.buzz([40, 80, 40, 80, 120]); }
+  };
+})();
+
+/* ==========================================================================
+   ESTADO
+   ========================================================================== */
+const S = {
+  grid: [],
+  solution: [],
+  cluesOriginales: new Set(),
+  selected: null,
+  history: [],
+  startTime: 0,
+  timerId: null,
+  difficulty: 'medio',
+  moves: 0,
+  hints: 0,
+  checks: 0,
+  finished: false,
+  flashDigit: null,
+  notesMode: false,
+  ultimoMovimiento: null,
+  rojo: null
+};
+
+let _saveT = null;
+function pideGuardado() {
+  clearTimeout(_saveT);
+  _saveT = setTimeout(guardarPartidaAhora, 400);
+}
+function guardarPartidaAhora() {
+  if (!S.solution.length || S.finished) return;
+  STORE.guardarPartida({
+    difficulty: S.difficulty,
+    solution: S.solution,
+    grid: S.grid.map(row => row.map(cell => ({
+      v: cell.v,
+      clue: cell.clue,
+      notes: Array.from(cell.notes || [])
+    }))),
+    cluesOriginales: Array.from(S.cluesOriginales),
+    startTime: S.startTime,
+    moves: S.moves,
+    hints: S.hints,
+    checks: S.checks,
+    history: S.history,
+    ultimoMovimiento: S.ultimoMovimiento,
+    selected: S.selected,
+    notesMode: S.notesMode,
+    rojo: S.rojo
+  });
+}
+
+/* ==========================================================================
+   GAME
+   ========================================================================== */
+const GAME = {
+  maxHints() { return DIFFS[S.difficulty].ayudas; },
+  hintsLeft() { return Math.max(0, this.maxHints() - S.hints); },
+  maxChecks() { return DIFFS[S.difficulty].checks; },
+  checksLeft() { return Math.max(0, this.maxChecks() - S.checks); },
+
+  nueva(diff) {
+    if (diff && DIFFS[diff]) S.difficulty = diff;
+    const p = BLOTTUKU.makePuzzle(S.difficulty);
+    S.solution = p.solucion;
+    S.cluesOriginales = new Set(p.clues);
+    S.grid = BLOTTUKU.crudoAEstado(p.solucion, p.clues);
+    this._inicia();
+    STORE.limpiarPartida();
+  },
+
+  reiniciar() {
+    if (!S.solution.length) return;
+    S.grid = BLOTTUKU.crudoAEstado(S.solution, S.cluesOriginales);
+    this._inicia();
+    UI.toast(I18N.t('toast_clean'));
+    pideGuardado();
+  },
+
+  _inicia() {
+    S.selected = null;
+    S.history = [];
+    S.moves = 0;
+    S.hints = 0;
+    S.checks = 0;
+    S.finished = false;
+    S.startTime = Date.now();
+    S.flashDigit = null;
+    S.notesMode = false;
+    S.ultimoMovimiento = null;
+    S.rojo = null;
+    if (S.timerId) clearInterval(S.timerId);
+    S.timerId = setInterval(() => UI.renderTime(), 1000);
+    UI.renderBoard();
+    UI.renderKeypad();
+    UI.renderTime();
+    UI.updateUndo();
+    UI.updateHintBtn();
+    UI.updateCheckBtn();
+    UI.syncNotesBtn();
+    const b = document.getElementById('board');
+    if (b) b.classList.remove('solved');
+  },
+
+  restaurar(datos) {
+    S.difficulty = datos.difficulty || 'medio';
+    S.solution = datos.solution;
+    S.grid = datos.grid.map(row => row.map(cell => ({
+      v: cell.v,
+      clue: !!cell.clue,
+      notes: new Set(cell.notes || [])
+    })));
+    S.cluesOriginales = new Set(datos.cluesOriginales || []);
+    S.startTime = datos.startTime || Date.now();
+    S.moves = datos.moves || 0;
+    S.hints = datos.hints || 0;
+    S.checks = datos.checks || 0;
+    S.finished = false;
+    S.history = datos.history || [];
+    S.ultimoMovimiento = datos.ultimoMovimiento || null;
+    S.selected = datos.selected || null;
+    S.notesMode = !!datos.notesMode;
+    S.flashDigit = null;
+    S.rojo = datos.rojo || null;
+    if (S.timerId) clearInterval(S.timerId);
+    S.timerId = setInterval(() => UI.renderTime(), 1000);
+    UI.renderBoard();
+    UI.renderKeypad();
+    UI.renderTime();
+    UI.updateUndo();
+    UI.updateHintBtn();
+    UI.updateCheckBtn();
+    UI.syncNotesBtn();
+    document.getElementById('board').classList.remove('solved');
+  },
+
+  select(r, c) {
+    if (S.finished) return;
+    const cell = S.grid[r][c];
+    if (cell.clue) return;
+    if (S.selected && S.selected.r === r && S.selected.c === c) {
+      S.selected = null; SOUND.select();
+      UI.renderBoard(); UI.renderKeypad();
+      return;
+    }
+    S.selected = { r, c };
+    SOUND.select();
+    UI.renderBoard(); UI.renderKeypad();
+    pideGuardado();
+  },
+
+  toggleNotes() {
+    S.notesMode = !S.notesMode;
+    UI.syncNotesBtn();
+    SOUND.select();
+    if (S.notesMode) UI.toast(I18N.t('toast_notes_on'));
+    pideGuardado();
+  },
+
+  place(d) {
+    if (!S.selected || S.finished) return;
+    const { r, c } = S.selected;
+    const cell = S.grid[r][c];
+    if (cell.clue) return;
+
+    if (S.notesMode) {
+      if (cell.v !== null) return;
+      if (!cell.notes) cell.notes = new Set();
+      if (cell.notes.has(d)) cell.notes.delete(d);
+      else cell.notes.add(d);
+      SOUND.note();
+      UI.renderBoard(); UI.renderKeypad();
+      pideGuardado();
+      return;
+    }
+
+    if (!BLOTTUKU.puedeIr(S.grid, r, c, d)) {
+      SOUND.error();
+      UI.toast(I18N.t('toast_cant_place'));
+      return;
+    }
+    const prev = cell.v;
+    if (prev === d) return;
+    cell.v = d;
+    cell.notes = new Set();
+    this._clearNotes(r, c, d);
+    S.history.push({ r, c, prev, prevNotes: null, prevClue: cell.clue, eraPista: false });
+    S.moves++;
+    S.flashDigit = d;
+    S.ultimoMovimiento = { r, c };
+    S.rojo = null;
+    SOUND.place();
+
+    let next = null;
+    for (let cc = c + 1; cc < N_COLS; cc++) {
+      if (!S.grid[r][cc].clue && S.grid[r][cc].v === null) { next = { r, c: cc }; break; }
+    }
+    if (!next) {
+      outer:
+      for (let rr = r + 1; rr < N_ROWS; rr++)
+        for (let cc = 0; cc < N_COLS; cc++)
+          if (!S.grid[rr][cc].clue && S.grid[rr][cc].v === null) { next = { r: rr, c: cc }; break outer; }
+    }
+    if (!next) {
+      outer2:
+      for (let rr = 0; rr < N_ROWS; rr++)
+        for (let cc = 0; cc < N_COLS; cc++)
+          if (!S.grid[rr][cc].clue && S.grid[rr][cc].v === null) { next = { r: rr, c: cc }; break outer2; }
+    }
+    S.selected = next;
+
+    UI.renderBoard();
+    UI.renderKeypad();
+    UI.updateUndo();
+    pideGuardado();
+
+    UI.pulsar(UI.cells[r + ',' + c], 'pop', 400);
+    if (BLOTTUKU.resuelto(S.grid)) setTimeout(() => this.win(), 300);
+  },
+
+  _clearNotes(r, c, d) {
+    for (let cc = 0; cc < N_COLS; cc++) {
+      if (cc === c) continue;
+      const cell = S.grid[r][cc];
+      if (cell.notes && cell.notes.has(d)) cell.notes.delete(d);
+    }
+    for (let rr = 0; rr < N_ROWS; rr++) {
+      if (rr === r) continue;
+      const cell = S.grid[rr][c];
+      if (cell.notes && cell.notes.has(d)) cell.notes.delete(d);
+    }
+  },
+
+  clear() {
+    if (!S.selected || S.finished) return;
+    const { r, c } = S.selected;
+    const cell = S.grid[r][c];
+    if (cell.clue) return;
+
+    if (S.notesMode) {
+      if (cell.notes && cell.notes.size) {
+        S.history.push({
+          r, c, prev: cell.v, prevNotes: Array.from(cell.notes),
+          prevClue: cell.clue, eraPista: false
+        });
+        cell.notes = new Set();
+        SOUND.clear();
+        UI.renderBoard();
+        pideGuardado();
+      }
+      return;
+    }
+
+    if (cell.v === null) return;
+    S.history.push({
+      r, c, prev: cell.v, prevNotes: null,
+      prevClue: cell.clue, eraPista: false
+    });
+    cell.v = null;
+    S.rojo = null;
+    SOUND.clear();
+    UI.renderBoard(); UI.renderKeypad(); UI.updateUndo();
+    pideGuardado();
+  },
+
+  undo() {
+    if (!S.history.length || S.finished) return;
+    const h = S.history.pop();
+    const cell = S.grid[h.r][h.c];
+    if (h.eraPista) { S.hints = Math.max(0, S.hints - 1); UI.updateHintBtn(true); }
+    cell.v = h.prev;
+    cell.notes = new Set(h.prevNotes || []);
+    if (h.prevClue !== undefined) cell.clue = h.prevClue;
+    S.rojo = null;
+    S.selected = { r: h.r, c: h.c };
+    SOUND.clear();
+    UI.renderBoard(); UI.renderKeypad(); UI.updateUndo();
+    pideGuardado();
+  },
+
+  _limpiaParaPista(r, c) {
+    const limpiadas = [];
+    for (let cc = 0; cc < N_COLS; cc++) {
+      if (cc === c) continue;
+      const cell = S.grid[r][cc];
+      if (cell.clue) continue;
+      if (cell.v !== null && cell.v !== S.solution[r][cc]) {
+        limpiadas.push({ r, c: cc, prev: cell.v, notes: Array.from(cell.notes || []) });
+        cell.v = null;
+        cell.notes = new Set();
+      }
+    }
+    for (let rr = 0; rr < N_ROWS; rr++) {
+      if (rr === r) continue;
+      const cell = S.grid[rr][c];
+      if (cell.clue) continue;
+      if (cell.v !== null && cell.v !== S.solution[rr][c]) {
+        limpiadas.push({ r: rr, c, prev: cell.v, notes: Array.from(cell.notes || []) });
+        cell.v = null;
+        cell.notes = new Set();
+      }
+    }
+    return limpiadas;
+  },
+
+  hint() {
+    if (S.finished) return;
+
+    if (this.hintsLeft() <= 0) {
+      SOUND.denied();
+      UI.toast(I18N.t('toast_no_hints', { diff: diffName(S.difficulty) }));
+      UI.updateHintBtn();
+      return;
+    }
+
+    const vacias = [];
+    for (let r = 0; r < N_ROWS; r++)
+      for (let c = 0; c < N_COLS; c++) {
+        const cell = S.grid[r][c];
+        if (cell.clue) continue;
+        if (cell.v !== null) continue;
+        const valor = S.solution[r][c];
+        const cands = BLOTTUKU.candidatos(S.grid, r, c).length;
+        vacias.push({ r, c, valor, cands });
+      }
+
+    if (!vacias.length) {
+      UI.toast(I18N.t('toast_board_ok'));
+      return;
+    }
+
+    let mejor = vacias[0];
+    for (let i = 1; i < vacias.length; i++)
+      if (vacias[i].cands < mejor.cands) mejor = vacias[i];
+    const empatadas = vacias.filter(x => x.cands === mejor.cands);
+    const h = empatadas[(Math.random() * empatadas.length) | 0];
+
+    const razon = this._razon(h.r, h.c);
+
+    const limpiadas = this._limpiaParaPista(h.r, h.c);
+
+    for (const l of limpiadas) {
+      S.history.push({
+        r: l.r, c: l.c,
+        prev: l.prev,
+        prevNotes: l.notes,
+        prevClue: false,
+        eraPista: false
+      });
+    }
+
+    const cell = S.grid[h.r][h.c];
+    S.history.push({
+      r: h.r, c: h.c,
+      prev: cell.v,
+      prevNotes: Array.from(cell.notes || []),
+      prevClue: cell.clue,
+      eraPista: true
+    });
+
+    cell.v = h.valor;
+    cell.notes = new Set();
+    cell.clue = true;
+    this._clearNotes(h.r, h.c, h.valor);
+    S.rojo = null;
+
+    S.hints++;
+    S.moves++;
+    S.ultimoMovimiento = { r: h.r, c: h.c };
+    SOUND.hint();
+    S.selected = null;
+
+    UI.renderBoard(); UI.renderKeypad(); UI.updateUndo(); UI.updateHintBtn(true);
+    pideGuardado();
+
+    UI.pulsar(UI.cells[h.r + ',' + h.c], 'hint-pop', 950);
+    for (const l of limpiadas) {
+      UI.pulsar(UI.cells[l.r + ',' + l.c], 'clear-pop', 600);
+    }
+    if (limpiadas.length) SOUND.conflict();
+
+    const restantes = this.hintsLeft();
+    const cola = restantes > 0
+      ? I18N.t('toast_hint_remaining', { n: restantes, max: this.maxHints() })
+      : I18N.t('toast_hint_last');
+    const colaLimpieza = limpiadas.length
+      ? I18N.t('toast_hint_cleared', { n: limpiadas.length })
+      : '';
+    UI.toast(I18N.t('toast_hint_placed', { v: h.valor, reason: razon }) + colaLimpieza + cola);
+    if (BLOTTUKU.resuelto(S.grid)) setTimeout(() => this.win(), 500);
+  },
+
+  _vecinasFijas(r, c) {
+    let fila = 0, col = 0;
+    for (let cc = 0; cc < N_COLS; cc++) {
+      if (cc === c) continue;
+      if (S.grid[r][cc].clue) fila++;
+    }
+    for (let rr = 0; rr < N_ROWS; rr++) {
+      if (rr === r) continue;
+      if (S.grid[rr][c].clue) col++;
+    }
+    return { fila, col };
+  },
+
+  check() {
+    if (S.finished) return;
+
+    if (this.checksLeft() <= 0) {
+      SOUND.denied();
+      UI.toast(I18N.t('toast_no_checks', { diff: diffName(S.difficulty) }));
+      UI.updateCheckBtn();
+      return;
+    }
+
+    const utiles = [];
+    const incorrectas = [];
+    let hayCorrecta = false;
+
+    for (let r = 0; r < N_ROWS; r++) {
+      for (let c = 0; c < N_COLS; c++) {
+        const cell = S.grid[r][c];
+        if (cell.clue) continue;
+        if (cell.v === null) continue;
+
+        if (cell.v === S.solution[r][c]) {
+          hayCorrecta = true;
+          const vec = this._vecinasFijas(r, c);
+          const trivial = (vec.fila >= 2) || (vec.col >= 8);
+          if (!trivial) utiles.push({ r, c, v: cell.v, peso: vec.fila * 3 + vec.col });
+        } else {
+          incorrectas.push({ r, c, v: cell.v });
+        }
+      }
+    }
+
+    if (utiles.length) {
+      let maxPeso = 0;
+      for (const u of utiles) if (u.peso > maxPeso) maxPeso = u.peso;
+      const top = utiles.filter(u => u.peso === maxPeso);
+      const h = top[(Math.random() * top.length) | 0];
+
+      const cell = S.grid[h.r][h.c];
+      S.history = S.history.filter(e => !(e.r === h.r && e.c === h.c));
+      cell.clue = true;
+      cell.notes = new Set();
+      this._clearNotes(h.r, h.c, h.v);
+
+      S.checks++;
+      S.moves++;
+      S.rojo = null;
+      S.ultimoMovimiento = { r: h.r, c: h.c };
+      SOUND.check();
+      S.selected = null;
+
+      UI.renderBoard(); UI.renderKeypad(); UI.updateUndo(); UI.updateCheckBtn(true);
+      pideGuardado();
+      UI.pulsar(UI.cells[h.r + ',' + h.c], 'hint-pop', 950);
+
+      const restantes = this.checksLeft();
+      const cola = restantes > 0
+        ? I18N.t('toast_check_remaining', { n: restantes, max: this.maxChecks() })
+        : I18N.t('toast_check_last');
+      UI.toast(I18N.t('toast_check_placed', { v: h.v }) + cola);
+      if (BLOTTUKU.resuelto(S.grid)) setTimeout(() => this.win(), 500);
+      return;
+    }
+
+    if (incorrectas.length) {
+      const h = incorrectas[(Math.random() * incorrectas.length) | 0];
+
+      S.checks++;
+      S.moves++;
+      S.rojo = h.r + ',' + h.c;
+      S.ultimoMovimiento = { r: h.r, c: h.c };
+      SOUND.checkRed();
+      S.selected = null;
+
+      UI.renderBoard(); UI.renderKeypad(); UI.updateUndo(); UI.updateCheckBtn(true);
+      pideGuardado();
+
+      UI.pulsar(UI.cells[h.r + ',' + h.c], 'wrong-pop', 850);
+
+      const restantes = this.checksLeft();
+      const cola = restantes > 0
+        ? I18N.t('toast_check_red_remaining', { n: restantes, max: this.maxChecks() })
+        : I18N.t('toast_check_red_last');
+      UI.toast(I18N.t('toast_check_red') + cola);
+      return;
+    }
+
+    SOUND.denied();
+    if (hayCorrecta) UI.toast(I18N.t('toast_check_trivial'));
+    else UI.toast(I18N.t('toast_check_none'));
+    UI.updateCheckBtn();
+  },
+
+  _razon(r, c) {
+    const e = BLOTTUKU.explicar(S.grid, r, c);
+    if (e.clave === 'col')  return I18N.t('exp_col');
+    if (e.clave === 'row')  return I18N.t('exp_row', { sum: e.suma, rem: e.queda });
+    if (e.clave === 'only') return I18N.t('exp_only');
+    return I18N.t('exp_deduce');
+  },
+
+  win() {
+    if (S.finished) return;
+    S.finished = true;
+    if (S.timerId) { clearInterval(S.timerId); S.timerId = null; }
+    const elapsed = Math.floor((Date.now() - S.startTime) / 1000);
+
+    /* Puntuación y récord */
+    const score = SCORE.calcular(S.difficulty, S.hints, S.checks);
+    const isNewRecord = STORE.saveRecord(S.difficulty, score);
+    const prevRecord = isNewRecord ? 0 : STORE.recordOf(S.difficulty);
+
+    SOUND.win();
+    document.getElementById('board').classList.add('solved');
+    UI.confetti();
+    STORE.addWin({
+      ts: Date.now(),
+      difficulty: S.difficulty,
+      time: elapsed,
+      moves: S.moves,
+      hints: S.hints,
+      checks: S.checks,
+      score,
+      record: isNewRecord
+    });
+    STORE.limpiarPartida();
+    setTimeout(() => UI.showWin(elapsed, score, isNewRecord, prevRecord), 600);
+  }
+};
+
+/* ==========================================================================
+   UI
+   ========================================================================== */
+const UI = {
+  cells: {},
+  keys: {},
+  el(id) { return document.getElementById(id); },
+
+  pulsar(el, cls, ms) {
+    if (!el) return;
+    const key = '_pulso_' + cls;
+    if (el[key]) { clearTimeout(el[key]); el[key] = 0; }
+    el.classList.remove(cls);
+    void el.offsetWidth;
+    el.classList.add(cls);
+    el[key] = setTimeout(() => { el.classList.remove(cls); el[key] = 0; }, ms || 1000);
+  },
+
+  init() {
+    const stored = STORE.load();
+    if (stored.lang && I18N.LANGS.indexOf(stored.lang) >= 0) I18N.set(stored.lang);
+    else I18N.set(I18N.detect());
+
+    this.buildBoard();
+    this.buildKeypad();
+    this.bindEvents();
+    this.applySoundState();
+    this.applyI18n();
+
+    const partida = STORE.cargarPartida();
+    if (partida && partida.solution && partida.grid) {
+      GAME.restaurar(partida);
+    } else {
+      GAME.nueva('medio');
+    }
+
+    const seen = STORE.load().tutorialSeen;
+    if (!seen) setTimeout(() => this.showTut(), 500);
+
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) guardarPartidaAhora();
+    });
+  },
+
+  buildBoard() {
+    const board = this.el('board');
+    board.innerHTML = '';
+    this.cells = {};
+
+    const head = document.createElement('div');
+    head.className = 'board-head';
+    for (let c = 0; c < N_COLS; c++) {
+      const col = document.createElement('div');
+      col.className = 'col-head';
+      col.dataset.c = c;
+      for (let d = 0; d <= 8; d++) {
+        const pip = document.createElement('span');
+        pip.className = 'pip';
+        pip.dataset.d = d;
+        pip.textContent = d;
+        col.appendChild(pip);
+      }
+      head.appendChild(col);
+    }
+    board.appendChild(head);
+
+    for (let r = 0; r < N_ROWS; r++) {
+      for (let c = 0; c < N_COLS; c++) {
+        const cell = document.createElement('button');
+        cell.className = 'cell';
+        cell.type = 'button';
+        cell.dataset.r = r;
+        cell.dataset.c = c;
+        cell.style.gridRow = String(r + 2);
+        cell.style.gridColumn = String(c + 1);
+        cell.setAttribute('aria-label', I18N.t('aria_row_col', { r: r + 1, c: c + 1 }));
+        cell.addEventListener('click', () => this.onCellTap(r, c));
+        board.appendChild(cell);
+        this.cells[r + ',' + c] = cell;
+      }
+      const sum = document.createElement('div');
+      sum.className = 'row-sum';
+      sum.dataset.r = r;
+      sum.style.gridRow = String(r + 2);
+      sum.style.gridColumn = '4';
+      board.appendChild(sum);
+    }
+  },
+
+  buildKeypad() {
+    const kp = this.el('keypad');
+    kp.innerHTML = '';
+    this.keys = {};
+    for (let d = 0; d <= 8; d++) {
+      const btn = document.createElement('button');
+      btn.className = 'key';
+      btn.type = 'button';
+      btn.dataset.d = d;
+      btn.innerHTML = '<span class="d">' + d + '</span><span class="count"></span>';
+      btn.addEventListener('click', () => GAME.place(d));
+      kp.appendChild(btn);
+      this.keys[d] = btn;
+    }
+    const erase = document.createElement('button');
+    erase.className = 'key erase';
+    erase.type = 'button';
+    erase.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 20H7L3 16l10-10 8 8-5 5"/></svg>';
+    erase.setAttribute('aria-label', I18N.t('aria_erase'));
+    erase.addEventListener('click', () => GAME.clear());
+    kp.appendChild(erase);
+    this.keys.erase = erase;
+  },
+
+  bindEvents() {
+    this.el('undo-btn').addEventListener('click', () => GAME.undo());
+    this.el('hint-btn').addEventListener('click', () => GAME.hint());
+    this.el('check-btn').addEventListener('click', () => GAME.check());
+    this.el('notes-btn').addEventListener('click', () => GAME.toggleNotes());
+    this.el('restart-btn').addEventListener('click', () => {
+      if (S.moves === 0 && S.hints === 0 && S.checks === 0) return;
+      this.showConfirm();
+    });
+    this.el('confirm-no').addEventListener('click', () => this.hideConfirm());
+    this.el('confirm-yes').addEventListener('click', () => {
+      this.hideConfirm();
+      GAME.reiniciar();
+    });
+
+    this.el('menu-btn').addEventListener('click', () => this.openMenu());
+    this.el('menu-cancel').addEventListener('click', () => this.closeMenu());
+    this.el('menu-start').addEventListener('click', () => {
+      const active = document.querySelector('.diff-btn.active');
+      const diff = active ? active.dataset.diff : 'medio';
+      this.closeMenu();
+      GAME.nueva(diff);
+    });
+    this.el('menu-help').addEventListener('click', () => { this.closeMenu(); this.showTut(); });
+    this.el('tut-ok').addEventListener('click', () => { this.hideTut(); STORE.patch({ tutorialSeen: true }); });
+    this.el('win-new').addEventListener('click', () => { this.hideWin(); this.openMenu(); });
+
+    this.el('sound-btn').addEventListener('click', () => {
+      const on = !SOUND.isOn();
+      SOUND.toggle(on);
+      STORE.patch({ sound: on });
+      this.applySoundState();
+      if (on) SOUND.select();
+    });
+
+    document.querySelectorAll('.lang-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const lang = btn.dataset.lang;
+        if (I18N.LANGS.indexOf(lang) < 0) return;
+        if (lang === I18N.lang) { SOUND.select(); return; }
+        I18N.set(lang);
+        STORE.patch({ lang });
+        this.applyI18n();
+        SOUND.select();
+      });
+    });
+
+    document.querySelectorAll('.diff-btn').forEach(b => {
+      b.addEventListener('click', () => {
+        document.querySelectorAll('.diff-btn').forEach(x => x.classList.remove('active'));
+        b.classList.add('active');
+      });
+    });
+
+    ['menu-overlay', 'win-overlay', 'tut-overlay', 'confirm-overlay'].forEach(id => {
+      this.el(id).addEventListener('click', e => {
+        if (e.target === this.el(id)) {
+          if (id === 'tut-overlay') { this.hideTut(); STORE.patch({ tutorialSeen: true }); }
+          else if (id === 'menu-overlay') this.closeMenu();
+          else if (id === 'confirm-overlay') this.hideConfirm();
+          else this.hideWin();
+        }
+      });
+    });
+
+    document.addEventListener('keydown', e => {
+      if (e.key >= '0' && e.key <= '8') { e.preventDefault(); GAME.place(parseInt(e.key, 10)); }
+      else if (e.key === 'Backspace' || e.key === 'Delete') { e.preventDefault(); GAME.clear(); }
+      else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); GAME.undo(); }
+      else if (e.key.toLowerCase() === 'n' && !e.ctrlKey && !e.metaKey) GAME.toggleNotes();
+      else if (e.key.toLowerCase() === 'h' && !e.ctrlKey && !e.metaKey) GAME.hint();
+      else if (e.key.toLowerCase() === 'k' && !e.ctrlKey && !e.metaKey) GAME.check();
+      else if (e.key === 'Escape') {
+        if (S.selected) { S.selected = null; UI.renderBoard(); UI.renderKeypad(); }
+        else { UI.closeMenu(); UI.hideWin(); UI.hideTut(); UI.hideConfirm(); }
+      }
+    });
+  },
+
+  onCellTap(r, c) {
+    const cell = S.grid[r][c];
+    if (cell.clue) {
+      this.pulsar(this.cells[r + ',' + c], 'pop', 400);
+      SOUND.select();
+      return;
+    }
+    GAME.select(r, c);
+  },
+
+  applyI18n() {
+    document.querySelectorAll('[data-i18n]').forEach(el => {
+      const k = el.dataset.i18n;
+      if (k) el.textContent = I18N.t(k);
+    });
+    document.querySelectorAll('[data-i18n-html]').forEach(el => {
+      const k = el.dataset.i18nHtml;
+      if (k) el.innerHTML = I18N.t(k);
+    });
+
+    document.querySelectorAll('[data-diff-info]').forEach(el => {
+      const k = el.dataset.diffInfo;
+      const d = DIFFS[k];
+      if (d) el.textContent = I18N.t('diff_info', {
+        pistas: d.pistas, ayudas: d.ayudas, checks: d.checks, base: d.base
+      });
+    });
+
+    try { document.documentElement.lang = I18N.lang; } catch (e) {}
+
+    const setAria = (id, key, vars) => {
+      const e = this.el(id);
+      if (e) e.setAttribute('aria-label', I18N.t(key, vars));
+    };
+    setAria('sound-btn', 'aria_sound');
+    setAria('menu-btn', 'aria_menu');
+    setAria('undo-btn', 'aria_undo');
+    setAria('notes-btn', 'aria_notes');
+    setAria('restart-btn', 'aria_restart');
+    if (this.keys && this.keys.erase) this.keys.erase.setAttribute('aria-label', I18N.t('aria_erase'));
+
+    for (let r = 0; r < N_ROWS; r++)
+      for (let c = 0; c < N_COLS; c++) {
+        const cell = this.cells[r + ',' + c];
+        if (cell) cell.setAttribute('aria-label', I18N.t('aria_row_col', { r: r + 1, c: c + 1 }));
+      }
+
+    this.updateHintBtn();
+    this.updateCheckBtn();
+
+    document.querySelectorAll('.lang-btn').forEach(b => {
+      b.classList.toggle('active', b.dataset.lang === I18N.lang);
+    });
+  },
+
+  renderBoard() {
+    const conflicts = BLOTTUKU.conflictos(S.grid, S.ultimoMovimiento);
+    const sel = S.selected;
+    const selDigit = sel ? S.grid[sel.r][sel.c].v : null;
+
+    for (let r = 0; r < N_ROWS; r++) {
+      for (let c = 0; c < N_COLS; c++) {
+        const el = this.cells[r + ',' + c];
+        const cell = S.grid[r][c];
+        const esRojo = (S.rojo === (r + ',' + c));
+
+        let cls = 'cell';
+        if (cell.clue) cls += ' clue';
+        else if (cell.v !== null) {
+          cls += ' filled';
+          if (esRojo) cls += ' wrong';
+        } else if (cell.notes && cell.notes.size) cls += ' notes';
+
+        if (sel) {
+          if (sel.r === r && sel.c === c) cls += ' selected';
+          else if (sel.r === r) cls += ' same-row';
+          else if (sel.c === c) cls += ' same-col';
+        }
+        if (conflicts.has(r + ',' + c)) cls += ' conflict';
+        if (selDigit !== null && cell.v === selDigit && !(sel.r === r && sel.c === c)) {
+          cls += ' same-digit';
+        }
+        el.className = cls;
+
+        if (cell.v !== null) {
+          const txt = String(cell.v);
+          if (el.textContent !== txt) el.textContent = txt;
+          if (el.querySelector('.notes-grid')) el.textContent = txt;
+          el._notesKey = '';
+        } else if (cell.notes && cell.notes.size) {
+          const key = Array.from(cell.notes).sort().join('');
+          if (el._notesKey !== key) {
+            let html = '<div class="notes-grid">';
+            for (let d = 0; d <= 8; d++) {
+              html += '<span class="' + (cell.notes.has(d) ? 'on' : '') + '">' + d + '</span>';
+            }
+            html += '</div>';
+            el.innerHTML = html;
+            el._notesKey = key;
+          }
+        } else {
+          if (el.textContent !== '' || el.querySelector('.notes-grid')) {
+            el.textContent = '';
+            el._notesKey = '';
+          }
+        }
+      }
+
+      const sumEl = document.querySelector('.row-sum[data-r="' + r + '"]');
+      const { suma, huecos } = BLOTTUKU.sumaFila(S.grid, r);
+      let newCls, newTxt;
+      if (huecos === 0 && suma === TARGET) { newCls = 'row-sum ok';    newTxt = '12/12'; }
+      else if (suma > TARGET)               { newCls = 'row-sum over';  newTxt = suma + '/12'; }
+      else if (huecos === 0)                { newCls = 'row-sum under'; newTxt = suma + '/12'; }
+      else                                  { newCls = 'row-sum';       newTxt = suma > 0 ? suma + '/12' : '0/12'; }
+      sumEl.className = newCls;
+      sumEl.textContent = newTxt;
+      sumEl.dataset.state = newCls;
+    }
+
+    for (let c = 0; c < N_COLS; c++) {
+      const usados = BLOTTUKU.columna(S.grid, c);
+      const col = document.querySelector('.col-head[data-c="' + c + '"]');
+      if (!col) continue;
+      col.querySelectorAll('.pip').forEach(pip => {
+        const d = +pip.dataset.d;
+        pip.className = 'pip' + (usados.has(d) ? ' used' : '');
+      });
+    }
+  },
+
+  renderKeypad() {
+    if (!S.grid.length) return;
+    const counts = BLOTTUKU.globalCounts(S.grid);
+    const sel = S.selected;
+    const colSet = sel ? BLOTTUKU.columna(S.grid, sel.c) : null;
+
+    const enNotas = S.notesMode && sel && S.grid[sel.r][sel.c].v === null;
+
+    for (let d = 0; d <= 8; d++) {
+      const btn = this.keys[d];
+      const remaining = Math.max(0, 3 - counts[d]);
+      btn.querySelector('.count').textContent = remaining > 0 ? remaining : '·';
+
+      let disabled = false, inCol = false;
+      if (enNotas) {
+        disabled = false;
+      } else if (counts[d] >= 3) {
+        disabled = true;
+      } else if (sel) {
+        if (colSet.has(d)) { inCol = true; disabled = true; }
+        else if (!BLOTTUKU.puedeIr(S.grid, sel.r, sel.c, d)) disabled = true;
+      }
+
+      let cls = 'key';
+      if (inCol) cls += ' in-col';
+      btn.className = cls;
+      btn.disabled = disabled;
+    }
+
+    const erase = this.keys.erase;
+    if (!sel || S.grid[sel.r][sel.c].clue) {
+      erase.disabled = true;
+    } else if (enNotas) {
+      erase.disabled = !(S.grid[sel.r][sel.c].notes && S.grid[sel.r][sel.c].notes.size);
+    } else {
+      erase.disabled = S.grid[sel.r][sel.c].v === null;
+    }
+
+    if (S.flashDigit !== null) {
+      const k = this.keys[S.flashDigit];
+      if (k) this.pulsar(k, 'flash', 420);
+      S.flashDigit = null;
+    }
+  },
+
+  updateHintBtn(pulse) {
+    const btn = this.el('hint-btn');
+    const badge = this.el('hint-badge');
+    if (!btn || !badge) return;
+    const restantes = GAME.hintsLeft();
+    badge.textContent = restantes > 0 ? String(restantes) : '0';
+    btn.disabled = restantes <= 0 || S.finished;
+    btn.setAttribute('aria-label',
+      restantes > 0 ? I18N.t('aria_hint_avail', { n: restantes }) : I18N.t('aria_hint_none'));
+    if (pulse) this.pulsar(btn, 'badge-pulse', 620);
+  },
+
+  updateCheckBtn(pulse) {
+    const btn = this.el('check-btn');
+    const badge = this.el('check-badge');
+    if (!btn || !badge) return;
+    const restantes = GAME.checksLeft();
+    badge.textContent = restantes > 0 ? String(restantes) : '0';
+    btn.disabled = restantes <= 0 || S.finished;
+    btn.setAttribute('aria-label',
+      restantes > 0 ? I18N.t('aria_check_avail', { n: restantes }) : I18N.t('aria_check_none'));
+    if (pulse) this.pulsar(btn, 'badge-pulse', 620);
+  },
+
+  syncNotesBtn() {
+    const btn = this.el('notes-btn');
+    if (!btn) return;
+    btn.classList.toggle('active', !!S.notesMode);
+  },
+
+  renderTime() {
+    if (!S.startTime) return;
+    const elapsed = Math.floor((Date.now() - S.startTime) / 1000);
+    const m = Math.floor(elapsed / 60);
+    const s = elapsed % 60;
+    const el = this.el('timer');
+    if (el) el.textContent = m + ':' + String(s).padStart(2, '0');
+  },
+
+  updateUndo() {
+    const el = this.el('undo-btn');
+    if (el) el.disabled = S.history.length === 0 || S.finished;
+  },
+
+  toast(msg) {
+    const t = this.el('toast');
+    if (!t) return;
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(this._toastT);
+    this._toastT = setTimeout(() => t.classList.remove('show'), 2400);
+  },
+
+  openMenu() { this.el('menu-overlay').classList.add('show'); },
+  closeMenu() { this.el('menu-overlay').classList.remove('show'); },
+  showTut() { this.el('tut-overlay').classList.add('show'); },
+  hideTut() { this.el('tut-overlay').classList.remove('show'); },
+  showConfirm() { this.el('confirm-overlay').classList.add('show'); },
+  hideConfirm() { this.el('confirm-overlay').classList.remove('show'); },
+
+  /* Conteo animado de la puntuación en el modal de victoria. */
+  _contarScore(hasta, ms) {
+    const el = this.el('win-score');
+    if (!el) return;
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      el.textContent = String(hasta);
+      return;
+    }
+    const t0 = performance.now();
+    const paso = () => {
+      const t = Math.min(1, (performance.now() - t0) / ms);
+      const v = Math.round(hasta * (1 - Math.pow(1 - t, 3)));
+      el.textContent = String(v);
+      if (t < 1) requestAnimationFrame(paso);
+      else el.textContent = String(hasta);
+    };
+    requestAnimationFrame(paso);
+  },
+
+  showWin(elapsed, score, isNewRecord, prevRecord) {
+    const m = Math.floor(elapsed / 60);
+    const s = elapsed % 60;
+    this.el('win-time').textContent = m + ':' + String(s).padStart(2, '0');
+    this.el('win-moves').textContent = S.moves;
+    this.el('win-helps').textContent = (S.hints + S.checks);
+
+    const total = S.hints + S.checks;
+    const sub = total === 0
+      ? I18N.t('no_help')
+      : (total === 1 ? I18N.t('one_hint') : I18N.t('n_hints', { n: total }));
+    this.el('win-sub').textContent = sub + ' · ' + diffName(S.difficulty);
+
+    /* Medalla */
+    const medalla = SCORE.medalla(S.hints, S.checks);
+    const medalEl = this.el('win-medal');
+    const medalLabel = this.el('win-medal-label');
+    medalEl.classList.remove('gold','silver','bronze');
+    if (medalla) {
+      medalEl.hidden = false;
+      medalEl.classList.add(medalla);
+      medalLabel.textContent = I18N.t('medal_' + medalla);
+    } else {
+      medalEl.hidden = true;
+    }
+
+    /* Puntuación + récord */
+    this._contarScore(score, 900);
+    const recEl = this.el('win-record');
+    recEl.classList.remove('new');
+    if (isNewRecord) {
+      recEl.textContent = I18N.t('record_beat');
+      recEl.classList.add('new');
+    } else {
+      recEl.textContent = I18N.t('record_best', { n: prevRecord });
+    }
+
+    this.el('win-overlay').classList.add('show');
+  },
+  hideWin() { this.el('win-overlay').classList.remove('show'); },
+
+  applySoundState() {
+    const on = SOUND.isOn();
+    const onIco = this.el('sound-on-icon');
+    const offIco = this.el('sound-off-icon');
+    const btn = this.el('sound-btn');
+    if (onIco) onIco.style.display = on ? '' : 'none';
+    if (offIco) offIco.style.display = on ? 'none' : '';
+    if (btn) btn.classList.toggle('off', !on);
+  },
+
+  confetti() {
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const cont = document.createElement('div');
+    cont.className = 'confetti';
+    document.body.appendChild(cont);
+    const colores = ['#b8934d','#5d7a5d','#b8604c','#d4b478','#8fae8f'];
+    for (let i = 0; i < 70; i++) {
+      const p = document.createElement('i');
+      p.style.left = (Math.random() * 100) + '%';
+      p.style.background = colores[i % colores.length];
+      p.style.animationDelay = (Math.random() * 0.45) + 's';
+      p.style.animationDuration = (1.6 + Math.random() * 0.9) + 's';
+      p.style.setProperty('--rx', (Math.random() * 720 - 360) + 'deg');
+      p.style.opacity = '1';
+      cont.appendChild(p);
+    }
+    setTimeout(() => cont.remove(), 3000);
+  }
+};
+
+/* ==========================================================================
+   PWA
+   ========================================================================== */
+(function PWA() {
+  function iconSvg(size) {
+    const s = size, pad = s * 0.2, inner = s - pad * 2, cell = (inner - 4) / 3;
+    let cells = '';
+    const pattern = ['gold','sage','gold','sage','gold','sage','gold','sage','sage'];
+    for (let r = 0; r < 3; r++) for (let c = 0; c < 3; c++) {
+      const x = pad + c * (cell + 2), y = pad + r * (cell + 2);
+      const fill = pattern[r*3+c] === 'gold' ? '#d4b478' : '#a3bca3';
+      cells += '<rect x="' + x + '" y="' + y + '" width="' + cell + '" height="' + cell +
+        '" rx="' + (cell * 0.22) + '" fill="' + fill + '"/>';
+    }
+    const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + s + '" height="' + s +
+      '" viewBox="0 0 ' + s + ' ' + s + '">' +
+      '<rect width="' + s + '" height="' + s + '" rx="' + (s * 0.22) + '" fill="#fdfaf2"/>' +
+      cells + '</svg>';
+    return 'data:image/svg+xml,' + encodeURIComponent(svg);
+  }
+
+  const manifest = {
+    name: 'Blottoku — Rompecabezas de Reparto',
+    short_name: 'Blottoku',
+    description: 'Rompecabezas de reparto con restricciones tipo sudoku',
+    start_url: '.', scope: '.',
+    display: 'standalone', orientation: 'portrait',
+    background_color: '#fdfaf2', theme_color: '#f7f1e3', lang: 'es',
+    icons: [
+      { src: iconSvg(192), sizes: '192x192', type: 'image/svg+xml', purpose: 'any' },
+      { src: iconSvg(512), sizes: '512x512', type: 'image/svg+xml', purpose: 'any' }
+    ]
+  };
+  try {
+    const blob = new Blob([JSON.stringify(manifest)], { type: 'application/manifest+json' });
+    document.getElementById('manifest-link').href = URL.createObjectURL(blob);
+  } catch(e) {}
+
+  if ('serviceWorker' in navigator) {
+    const sw = "const C='blottoku-v19';" +
+      "self.addEventListener('install',e=>{e.waitUntil(caches.open(C).then(c=>c.addAll(['./']).catch(()=>{})));self.skipWaiting()});" +
+      "self.addEventListener('activate',e=>{e.waitUntil(clients.claim())});" +
+      "self.addEventListener('fetch',e=>{const u=new URL(e.request.url);if(e.request.method!=='GET'||u.origin!==location.origin)return;e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request).then(resp=>{const cp=resp.clone();caches.open(C).then(c=>c.put(e.request,cp));return resp}).catch(()=>caches.match('./'))))});";
+    try {
+      const blob = new Blob([sw], { type: 'text/javascript' });
+      navigator.serviceWorker.register(URL.createObjectURL(blob)).catch(() => {});
+    } catch(e) {}
+  }
+})();
+
+/* ---------- Boot ---------- */
+function _boot() {
+  if (typeof window !== 'undefined' && window.BLOTTUKU_TESTS) {
+    try { BLOTTUKU._selfTest(); console.log('[Blottoku] tests OK'); }
+    catch (e) { console.error('[Blottoku] tests FALLAN', e); }
+  }
+  UI.init();
+}
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', _boot);
+} else {
+  _boot();
+}
+</script>
 </body>
 </html>
