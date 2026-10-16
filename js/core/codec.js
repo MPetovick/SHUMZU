@@ -18,7 +18,7 @@ export async function prepareBytes({ name, mime = '', data }, password, { S = DE
     throw new Error(`La contraseña debe tener al menos ${MIN_PASSWORD} caracteres`);
   }
   if (!Number.isInteger(S) || S < 16 || S > MAX_SYMBOL) throw new Error('tamaño de símbolo no válido');
-  if (data.length > MAX_FILE_BYTES) throw new Error('archivo demasiado grande para v0.0.1a (máx. 8 MB)');
+  if (data.length > MAX_FILE_BYTES) throw new Error('archivo demasiado grande para v0.1.0 (máx. 8 MB)');
 
   const sha256 = await sha256Hex(data);
   const plain = packPlain({ name, mime, size: data.length, sha256, data });

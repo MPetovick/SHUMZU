@@ -4,9 +4,16 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="color-scheme" content="dark light">
-  <meta name="theme-color" content="#0b0d10">
+  <meta name="theme-color" content="#0b0d12" media="(prefers-color-scheme: dark)">
+  <meta name="theme-color" content="#f3f5fb" media="(prefers-color-scheme: light)">
+  <meta name="description" content="Transferencia de archivos cifrados por códigos QR. Sin servidores.">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="SHUMZU">
   <title>SHUMZU</title>
-  <link rel="icon" href="data:,">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
@@ -14,11 +21,13 @@
 
   <header class="bar">
     <div class="brand">
-      <span class="dot" aria-hidden="true"></span>
-      <b>SHUMZU</b>
-      <small>v0.0.1a</small>
+      <span class="logo" aria-hidden="true"></span>
+      <div>
+        <b>SHUMZU</b>
+        <small>v0.1.0</small>
+      </div>
     </div>
-    <div class="conn" id="conn" title="Todo se queda en este dispositivo">offline</div>
+    <div class="conn" id="conn" data-online="true">Todo local</div>
   </header>
 
   <section class="stats" aria-label="Resumen">
@@ -32,14 +41,15 @@
     <!-- POKÉDEX -->
     <section id="v-dex" class="view active" aria-label="Pokédex">
       <div class="toolbar">
-        <input id="dex-filter" type="search" placeholder="Buscar por nombre o sesión" autocomplete="off">
+        <input id="dex-filter" type="search" placeholder="Buscar por nombre o sesión" autocomplete="off" enterkeyhint="search">
         <button id="dex-bag" class="ghost" disabled title="Exportar todo lo capturado para relevo en malla">Relevo</button>
       </div>
       <div id="dex-grid" class="grid"></div>
-      <p id="dex-empty" class="empty">
-        Sin capturas todavía.<br>
-        Escanea QR con la cámara o importa un GIF de códigos.
-      </p>
+      <div id="dex-empty" class="empty">
+        <div class="empty-art" aria-hidden="true">◎</div>
+        <p><b>Sin capturas todavía</b></p>
+        <p>Escanea QR con la cámara o importa un GIF de códigos.</p>
+      </div>
     </section>
 
     <!-- CAPTURAR -->
@@ -57,8 +67,9 @@
       </div>
       <input id="imp-input" type="file" accept="image/gif,image/png,image/jpeg,image/webp" multiple hidden>
 
-      <div id="drop" class="drop" tabindex="0">
-        Arrastra aquí un GIF o capturas de QR
+      <div id="drop" class="drop" tabindex="0" role="button">
+        <span class="drop-ico" aria-hidden="true">⤓</span>
+        <span>Arrastra aquí un GIF o capturas de QR</span>
         <small id="imp-state"></small>
       </div>
 
@@ -76,6 +87,7 @@
     <section id="v-send" class="view" aria-label="Enviar">
       <label id="send-drop" class="drop file">
         <input id="s-file" type="file" class="sr">
+        <span class="drop-ico" aria-hidden="true">⤒</span>
         <span id="s-fname">Elige o arrastra un archivo (máx. 8 MB)</span>
       </label>
 
@@ -122,9 +134,18 @@
   </main>
 
   <nav class="dock" aria-label="Navegación">
-    <button class="tab active" data-view="v-dex"><span class="ico">◉</span>Pokédex</button>
-    <button class="tab" data-view="v-scan"><span class="ico">◎</span>Capturar</button>
-    <button class="tab" data-view="v-send"><span class="ico">↗</span>Enviar</button>
+    <button class="tab active" data-view="v-dex" aria-selected="true">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/></svg>
+      <span>Pokédex</span>
+    </button>
+    <button class="tab" data-view="v-scan" aria-selected="false">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2"/><circle cx="12" cy="12" r="3"/></svg>
+      <span>Capturar</span>
+    </button>
+    <button class="tab" data-view="v-send" aria-selected="false">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h13M13 6l6 6-6 6"/></svg>
+      <span>Enviar</span>
+    </button>
   </nav>
 
   <div id="toast" class="toast" role="status" hidden></div>
@@ -133,9 +154,12 @@
 <dialog id="detail" aria-labelledby="d-title">
   <article class="sheet">
     <header class="sheet-head">
-      <span id="d-num" class="num">#000</span>
-      <span id="d-src" class="type">QR</span>
-      <form method="dialog"><button class="ghost" aria-label="Cerrar">✕</button></form>
+      <span class="grab" aria-hidden="true"></span>
+      <div class="sheet-row">
+        <span id="d-num" class="num">#000</span>
+        <span id="d-src" class="type">QR</span>
+        <form method="dialog"><button class="ghost icon" aria-label="Cerrar">✕</button></form>
+      </div>
     </header>
     <h2 id="d-title">Sesión</h2>
     <code id="d-sid" class="sid"></code>
@@ -166,8 +190,7 @@
   </article>
 </dialog>
 
-<script src="vendor/qrcode.bundle.js"></script>
-<script src="vendor/jsQR.js"></script>
+<script src="vendor/qrcode.bundle.js" defer></script>
 <script type="module" src="js/app.js"></script>
 </body>
 </html>

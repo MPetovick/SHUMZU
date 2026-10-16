@@ -1,27 +1,39 @@
-// SHUMZU · controlador de la interfaz.
+// SHUMZU v0.1.0 · controlador de la interfaz.
 // Todo texto que venga de fuera (nombres de archivo, contenido) se inserta con textContent.
+//
+// Rendimiento:
+// - La Pokédex actualiza las tarjetas por clave (sesión) en vez de reconstruir el DOM.
+// - Las escrituras van a IndexedDB por fotograma, no como base64 completo.
+// - El carrusel dibuja con matrices cacheadas y precalienta el siguiente fotograma
+//   en tiempo ocioso; se detiene fuera de la vista de envío o con la pestaña oculta.
+// - Los renders se agrupan en un solo frame de animación.
 import {
   prepareBytes, frameAt, frameToText, textToFrame, Receiver, recommendedCount,
-  sessionIdOf, MIN_PASSWORD, MAX_FILE_BYTES,
+  MIN_PASSWORD, MAX_FILE_BYTES,
 } from './core/codec.js';
 import { encodeBag, decodeBag, FrameStore } from './core/bag.js';
+import { decodeFrame, toHex } from './core/format.js';
 import { qrGifBytes, qrMake } from './core/qrgif.js';
-import { renderFrame, Scanner } from './visual.js';
+import { renderFrame, matrixOf, Scanner } from './visual.js';
 import { codesFromFile } from './scan.js';
+import { FrameDB } from './store.js';
 
 const $ = (id) => document.getElementById(id);
-const KEY = 'shumzu.v1.frames';
+const LEGACY_KEY = 'shumzu.v1.frames';
 const TYPE_CLASS = { QR: 't-qr', GIF: 't-gif', IMG: 't-img', LOCAL: 't-local', PEGADO: 't-paste' };
 
 // ---------- estado ----------
 const store = new FrameStore();          // fotogramas, deduplicados por (sesión, seed)
+const db = new FrameDB();                // persistencia por fotograma
 const entries = new Map();               // sid -> { sid, rx, src, num, plain }
+const cards = new Map();                 // sid -> nodo de tarjeta (reutilizado)
 let seq = 0;
+let frameCount = 0;
 const counters = { bad: 0, dup: 0 };
 let current = null;                      // sid abierto en el diálogo
 let previewUrl = null;
 let renderQueued = false;
-let saveTimer = null;
+let lastScan = '';
 
 // ---------- utilidades ----------
 function el(tag, attrs = {}, ...kids) {
@@ -35,11 +47,13 @@ function el(tag, attrs = {}, ...kids) {
   return n;
 }
 
+const keyOf = (sid, seed) => `${sid}:${seed}`;
 const safeName = (s) => (s || 'archivo').replace(/[\\/:*?"<>|\x00-\x1f]+/g, '_').slice(0, 120) || 'archivo';
 const fmtBytes = (n) => (n < 1024 ? n + ' B' : n < 1048576 ? (n / 1024).toFixed(1) + ' KB' : (n / 1048576).toFixed(2) + ' MB');
 const pad = (n) => '#' + String(n).padStart(3, '0');
 const title = (e) => (e.plain ? e.plain.name : 'Sesión ' + e.sid.slice(0, 8).toUpperCase());
 const solved = (e) => (e.rx.dec ? e.rx.dec.solvedCount : 0);
+const nextFrame = () => new Promise((r) => requestAnimationFrame(() => r()));
 
 function toast(msg, tone = '') {
   const t = $('toast');
@@ -66,51 +80,30 @@ function download(bytes, name, type = 'application/octet-stream') {
   setTimeout(() => URL.revokeObjectURL(url), 10000);
 }
 
-const nextFrame = () => new Promise((r) => requestAnimationFrame(() => r()));
-
-// ---------- persistencia (solo en este dispositivo) ----------
 function toB64(bytes) {
   let s = '';
   for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
   return btoa(s);
 }
+
 function fromB64(str) {
   const bin = atob(str);
   const u = new Uint8Array(bin.length);
   for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i);
   return u;
 }
-function saveNow() {
-  try {
-    const frames = store.allFrames();
-    if (!frames.length) localStorage.removeItem(KEY);
-    else localStorage.setItem(KEY, toB64(encodeBag(frames)));
-  } catch {
-    toast('No se pudo guardar en este navegador (¿cuota llena?)', 'err');
-  }
-}
-function scheduleSave() {
-  clearTimeout(saveTimer);
-  saveTimer = setTimeout(saveNow, 300);
-}
-function loadSaved() {
-  try {
-    const raw = localStorage.getItem(KEY);
-    if (!raw) return;
-    for (const f of decodeBag(fromB64(raw))) ingestBytes(f, 'LOCAL');
-  } catch {
-    localStorage.removeItem(KEY);
-  }
-}
 
 // ---------- captura ----------
-// Un fotograma nuevo entra en el almacén y en el receptor de su sesión.
-function ingestBytes(bytes, src) {
+// Un fotograma nuevo entra en el almacén, en el receptor de su sesión y (opcional) en disco.
+function ingestBytes(bytes, src, { persist = true } = {}) {
   const st = store.add(bytes);
   if (st === 'dup') counters.dup++;
   if (st === 'invalid') counters.bad++;
   if (st !== 'new') return { st, e: null };
-  const sid = sessionIdOf(bytes);
+  frameCount++;
+  const f = decodeFrame(bytes);
+  const sid = toHex(f.session);
+  if (persist) db.put(keyOf(sid, f.seed), bytes.slice());
   let e = entries.get(sid);
   if (!e) {
     e = { sid, rx: new Receiver(), src, num: ++seq, plain: null };
@@ -129,6 +122,18 @@ function ingestText(text, src) {
     return { st: 'invalid', e: null };
   }
   return ingestBytes(bytes, src);
+}
+
+// Borra una sesión de memoria y de disco.
+function forgetSession(sid) {
+  for (const f of store.framesOf(sid)) {
+    db.del(keyOf(sid, decodeFrame(f).seed));
+    frameCount--;
+  }
+  store.remove(sid);
+  entries.delete(sid);
+  cards.get(sid)?.remove();
+  cards.delete(sid);
 }
 
 function scheduleRender() {
@@ -159,30 +164,31 @@ async function importFiles(files) {
     }
   }
   $('imp-state').textContent = '';
-  saveNow();
-  render();
+  scheduleRender();
 }
 
 // ---------- cámara ----------
 const scanner = new Scanner($('cam'), (text) => {
+  if (text === lastScan) return; // el mismo código sigue en cámara: no reprocesar
+  lastScan = text;
   const { st, e } = ingestText(text, 'QR');
   if (st === 'new' || st === 'done') {
     log(`${pad(e.num)} · ${solved(e)}/${e.rx.K} símbolos`, 'ok');
     if (st === 'done') toast(`${pad(e.num)} completo`, 'ok');
-    scheduleSave();
     scheduleRender();
   }
-  $('scan-state').textContent = `Escaneando · ${store.allFrames().length} fotogramas`;
+  $('scan-state').textContent = `Escaneando · ${frameCount} fotogramas`;
 });
 
+function stopCamera() {
+  scanner.stop();
+  $('scanner').classList.remove('live');
+  $('cam-btn').textContent = 'Activar cámara';
+  $('scan-state').textContent = 'Cámara apagada';
+}
+
 $('cam-btn').addEventListener('click', async () => {
-  if (scanner.running) {
-    scanner.stop();
-    $('scanner').classList.remove('live');
-    $('cam-btn').textContent = 'Activar cámara';
-    $('scan-state').textContent = 'Cámara apagada';
-    return;
-  }
+  if (scanner.running) return stopCamera();
   try {
     await scanner.start();
     $('scanner').classList.add('live');
@@ -212,6 +218,12 @@ drop.addEventListener('drop', (ev) => {
   if (files.length) importFiles(files);
 });
 drop.addEventListener('click', () => $('imp-input').click());
+drop.addEventListener('keydown', (ev) => {
+  if (ev.key === 'Enter' || ev.key === ' ') {
+    ev.preventDefault();
+    $('imp-input').click();
+  }
+});
 
 $('paste-btn').addEventListener('click', () => {
   const text = $('paste-text').value;
@@ -223,8 +235,7 @@ $('paste-btn').addEventListener('click', () => {
   if (st === 'new' || st === 'done') {
     log(`${pad(e.num)} · pegado · ${solved(e)}/${e.rx.K}`, 'ok');
     $('paste-text').value = '';
-    saveNow();
-    render();
+    scheduleRender();
   }
 });
 
@@ -238,7 +249,7 @@ function renderStats() {
   const all = [...entries.values()];
   $('st-entries').textContent = all.length;
   $('st-done').textContent = all.filter((e) => e.rx.complete).length;
-  $('st-frames').textContent = store.allFrames().length;
+  $('st-frames').textContent = frameCount;
   $('st-open').textContent = all.filter((e) => !e.rx.complete).length;
 }
 
@@ -248,37 +259,49 @@ function cardState(e) {
   return 'open';
 }
 
-function card(e) {
+// Crea la tarjeta una vez y después solo actualiza sus campos.
+function cardFor(e) {
+  let c = cards.get(e.sid);
+  if (!c) {
+    const sid = e.sid;
+    c = el('button', { class: 'card', type: 'button' },
+      el('div', { class: 'card-top' }, el('span', { class: 'num' }), el('span', { class: 'type' })),
+      el('div', { class: 'title' }),
+      el('div', { class: 'track' }, el('i')),
+      el('div', { class: 'meta' }, el('span'), el('b')));
+    c.addEventListener('click', () => openDetail(sid));
+    cards.set(sid, c);
+  }
   const state = cardState(e);
   const label = state === 'done' ? 'descifrado' : state === 'locked' ? 'listo · falta clave' : 'en curso';
-  const fill = el('i');
-  fill.style.width = Math.round(e.rx.progress * 100) + '%';
-  const btn = el('button', { class: `card ${state} ${TYPE_CLASS[e.src] || 't-local'}`, type: 'button' },
-    el('div', { class: 'card-top' },
-      el('span', { class: 'num' }, pad(e.num)),
-      el('span', { class: 'type' }, e.src)),
-    el('div', { class: 'title' }, title(e)),
-    el('div', { class: 'track' }, fill),
-    el('div', { class: 'meta' },
-      el('span', {}, `${solved(e)}/${e.rx.K}`),
-      el('b', {}, label)),
-  );
-  btn.addEventListener('click', () => openDetail(e.sid));
-  return btn;
+  c.className = `card ${state} ${TYPE_CLASS[e.src] || 't-local'}`;
+  c.firstChild.firstChild.textContent = pad(e.num);
+  c.firstChild.lastChild.textContent = e.src;
+  c.children[1].textContent = title(e);
+  c.children[2].firstChild.style.width = Math.round(e.rx.progress * 100) + '%';
+  c.children[3].firstChild.textContent = `${solved(e)}/${e.rx.K}`;
+  c.children[3].lastChild.textContent = label;
+  return c;
 }
 
 function renderGrid() {
   const q = $('dex-filter').value.trim().toLowerCase();
-  const grid = $('dex-grid');
   const list = [...entries.values()]
     .filter((e) => !q || title(e).toLowerCase().includes(q) || e.sid.includes(q))
     .sort((a, b) => a.num - b.num);
-  grid.replaceChildren(...list.map(card));
+  // Quita las tarjetas de sesiones que ya no existen.
+  for (const sid of [...cards.keys()]) {
+    if (!entries.has(sid)) {
+      cards.get(sid).remove();
+      cards.delete(sid);
+    }
+  }
+  $('dex-grid').replaceChildren(...list.map(cardFor));
   $('dex-empty').hidden = entries.size > 0;
-  $('dex-bag').disabled = store.allFrames().length === 0;
+  $('dex-bag').disabled = frameCount === 0;
 }
 
-$('dex-filter').addEventListener('input', renderGrid);
+$('dex-filter').addEventListener('input', scheduleRender);
 $('dex-bag').addEventListener('click', () => {
   const frames = store.allFrames();
   if (frames.length) download(encodeBag(frames), 'shumzu-relevo.szb');
@@ -291,12 +314,9 @@ function openDetail(sid) {
   current = sid;
   $('d-num').textContent = pad(e.num);
   $('d-src').textContent = e.src;
-  $('d-title').textContent = title(e);
   $('d-sid').textContent = e.sid;
   $('d-k').textContent = e.rx.K;
-  $('d-solved').textContent = solved(e);
-  $('d-frames').textContent = store.framesOf(sid).length;
-  $('d-bar').style.width = Math.round(e.rx.progress * 100) + '%';
+  $('d-frames').textContent = store.count(sid);
   $('d-err').hidden = true;
   $('d-pass').value = '';
   renderDetail(e);
@@ -400,7 +420,7 @@ $('d-decrypt').addEventListener('click', async () => {
     $('d-pass').value = '';
     $('d-err').hidden = true;
     renderDetail(e);
-    render();
+    scheduleRender();
     toast(`${e.plain.name} verificado`, 'ok');
   } catch (err) {
     $('d-err').textContent = err.message;
@@ -420,11 +440,9 @@ $('d-bag').addEventListener('click', () => {
 $('d-del').addEventListener('click', () => {
   if (!current) return;
   if (!confirm('¿Borrar esta entrada y sus fotogramas de este dispositivo?')) return;
-  store.remove(current);
-  entries.delete(current);
+  forgetSession(current);
   $('detail').close();
-  saveNow();
-  render();
+  scheduleRender();
   toast('Entrada borrada', 'ok');
 });
 
@@ -433,41 +451,56 @@ let prep = null;
 let fileName = '';
 let idx = 0;
 let playing = true;
-let timer = null;
-let drawSeq = 0;
 let sizeChoice = 200;
+let tickTimer = null;
 const sCanvas = $('s-canvas');
+const fps = () => Number($('s-speed').value);
+const sendActive = () => $('v-send').classList.contains('active') && !document.hidden;
 
-function fps() {
-  return Number($('s-speed').value);
+function showFrame() {
+  renderFrame(sCanvas, frameToText(frameAt(prep, idx)));
+  $('k-t').textContent = Math.ceil(idx / fps()) + ' s';
+  prefetchNext();
 }
 
-function drawCurrent() {
-  const mine = ++drawSeq;
-  renderFrame(sCanvas, frameToText(frameAt(prep, idx))).then(() => {
-    if (mine === drawSeq) $('k-t').textContent = Math.ceil(idx / fps()) + ' s';
-  });
+// Calcula la matriz del siguiente fotograma en tiempo ocioso, para que el cambio sea instantáneo.
+function prefetchNext() {
+  const p = prep;
+  const i = idx + 1;
+  const job = () => { if (p === prep) matrixOf(frameToText(frameAt(p, i))); };
+  if ('requestIdleCallback' in window) requestIdleCallback(job, { timeout: 500 });
+  else setTimeout(job, 0);
 }
 
-function startCarousel() {
-  clearInterval(timer);
-  timer = setInterval(() => {
-    if (!playing) return;
-    idx++;
-    drawCurrent();
-  }, 1000 / fps());
-  $('s-fps-label').textContent = fps() + ' fps';
+function stopTick() {
+  clearTimeout(tickTimer);
+  tickTimer = null;
+}
+
+function runTick() {
+  tickTimer = null;
+  if (!prep || !playing || !sendActive()) return;
+  idx++;
+  showFrame();
+  tickTimer = setTimeout(runTick, 1000 / fps());
+}
+
+function startTick() {
+  stopTick();
+  if (prep && playing && sendActive()) tickTimer = setTimeout(runTick, 1000 / fps());
 }
 
 $('s-file').addEventListener('change', (ev) => {
   const f = ev.target.files[0];
   $('s-fname').textContent = f ? `${f.name} · ${fmtBytes(f.size)}` : 'Elige o arrastra un archivo (máx. 8 MB)';
 });
-$('send-drop').addEventListener('dragover', (ev) => { ev.preventDefault(); $('send-drop').classList.add('over'); });
-$('send-drop').addEventListener('dragleave', () => $('send-drop').classList.remove('over'));
-$('send-drop').addEventListener('drop', (ev) => {
+
+const sendDrop = $('send-drop');
+sendDrop.addEventListener('dragover', (ev) => { ev.preventDefault(); sendDrop.classList.add('over'); });
+sendDrop.addEventListener('dragleave', () => sendDrop.classList.remove('over'));
+sendDrop.addEventListener('drop', (ev) => {
   ev.preventDefault();
-  $('send-drop').classList.remove('over');
+  sendDrop.classList.remove('over');
   const f = ev.dataTransfer?.files?.[0];
   if (f) {
     const input = $('s-file');
@@ -495,9 +528,13 @@ $('s-size').addEventListener('click', (ev) => {
   }
 });
 
+function showSendErr(msg) {
+  $('s-err').textContent = msg;
+  $('s-err').hidden = false;
+}
+
 $('s-go').addEventListener('click', async () => {
-  const err = $('s-err');
-  err.hidden = true;
+  $('s-err').hidden = true;
   const file = $('s-file').files[0];
   const pass = $('s-pass').value;
   if (!file) return showSendErr('Elige un archivo.');
@@ -518,8 +555,8 @@ $('s-go').addEventListener('click', async () => {
     $('k-k').textContent = prep.K;
     $('k-f').textContent = recommendedCount(prep);
     $('s-out').hidden = false;
-    startCarousel();
-    drawCurrent();
+    showFrame();
+    startTick();
     toast(`${prep.K} bloques listos`, 'ok');
   } catch (e) {
     showSendErr(e.message);
@@ -529,16 +566,16 @@ $('s-go').addEventListener('click', async () => {
   }
 });
 
-function showSendErr(msg) {
-  $('s-err').textContent = msg;
-  $('s-err').hidden = false;
-}
-
 $('s-play').addEventListener('click', () => {
   playing = !playing;
   $('s-play').textContent = playing ? 'Pausa' : 'Reanudar';
+  startTick();
 });
-$('s-speed').addEventListener('input', () => { if (prep) startCarousel(); });
+
+$('s-speed').addEventListener('input', () => {
+  $('s-fps-label').textContent = fps() + ' fps';
+  startTick();
+});
 
 $('s-gif').addEventListener('click', async () => {
   if (!prep) return;
@@ -567,16 +604,79 @@ $('s-bag').addEventListener('click', () => {
 });
 
 // ---------- navegación ----------
-document.querySelectorAll('.dock .tab').forEach((btn) => {
-  btn.addEventListener('click', () => {
-    for (const b of document.querySelectorAll('.dock .tab')) b.classList.toggle('active', b === btn);
-    for (const v of document.querySelectorAll('.view')) v.classList.toggle('active', v.id === btn.dataset.view);
-    if (btn.dataset.view !== 'v-scan' && scanner.running) $('cam-btn').click();
-    if (btn.dataset.view === 'v-dex') render();
-  });
+function show(view) {
+  for (const b of document.querySelectorAll('.dock .tab')) {
+    const on = b.dataset.view === view;
+    b.classList.toggle('active', on);
+    b.setAttribute('aria-selected', String(on));
+  }
+  for (const v of document.querySelectorAll('.view')) v.classList.toggle('active', v.id === view);
+  if (view !== 'v-scan' && scanner.running) stopCamera();
+  if (view === 'v-dex') scheduleRender();
+  if (view === 'v-send') startTick();
+  else stopTick();
+}
+
+for (const btn of document.querySelectorAll('.dock .tab')) {
+  btn.addEventListener('click', () => show(btn.dataset.view));
+}
+
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) stopTick();
+  else startTick();
 });
 
-// ---------- arranque ----------
-loadSaved();
-render();
-$('conn').textContent = navigator.onLine ? 'offline · local' : 'sin red · local';
+function updateConn() {
+  const on = navigator.onLine;
+  $('conn').textContent = on ? 'Todo local' : 'Sin red · local';
+  $('conn').dataset.online = String(on);
+}
+addEventListener('online', updateConn);
+addEventListener('offline', updateConn);
+
+// ---------- persistencia y arranque ----------
+function readLegacy() {
+  try {
+    const raw = localStorage.getItem(LEGACY_KEY);
+    return raw ? decodeBag(fromB64(raw)) : null;
+  } catch {
+    localStorage.removeItem(LEGACY_KEY);
+    return null;
+  }
+}
+
+async function boot() {
+  db.onError = () => toast('No se pudo guardar en este navegador (¿cuota llena?)', 'err');
+  const persistent = await db.init();
+  if (persistent) {
+    // Migración única desde la versión anterior (base64 en localStorage).
+    const legacy = readLegacy();
+    if (legacy) {
+      for (const f of legacy) ingestBytes(f, 'LOCAL');
+      try {
+        await db.flush();
+        localStorage.removeItem(LEGACY_KEY);
+      } catch {
+        // Si falla, se conserva la clave antigua para el siguiente arranque.
+      }
+    }
+    try {
+      for (const f of await db.loadAll()) ingestBytes(f, 'LOCAL', { persist: false });
+    } catch {
+      toast('No se pudieron leer las capturas guardadas', 'err');
+    }
+  } else {
+    toast('Este navegador no guarda en disco: las capturas se pierden al cerrar', 'err');
+    for (const f of readLegacy() || []) ingestBytes(f, 'LOCAL', { persist: false });
+  }
+  navigator.storage?.persist?.().catch(() => {});
+  render();
+}
+
+updateConn();
+show('v-dex');
+boot();
+
+if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+}
