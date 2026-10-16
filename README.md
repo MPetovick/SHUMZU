@@ -1,167 +1,159 @@
-# SHUMZU v0.2.0
+# Sembrado
 
-Transferencia de archivos cifrados **sin servidor ni cuenta**, de forma airgap: los archivos salen
-como códigos QR (en pantalla, en un GIF o en una captura) y se reconstruyen al otro lado
-escaneando. Los fotogramas también pueden relevarse en bolsas `.szb`.
+Estrategia por casillas para dos jugadores, con espíritu de Risk y del ajedrez. Los dos jugadores ordenan **a la vez y en secreto**; después se revela todo y se resuelve. PWA instalable, PvP directo entre móviles por WebRTC y partida contra el bot sin conexión.
 
-Novedades de la 0.2.0 (detalle en `CHANGELOG.md`; fallos de 0.0.1a en `AUDITORIA.md`):
+**Versión:** 0.0.1 (nombre provisional)
 
-- **Escaneo «ráfaga»:** varios QR por pantalla (mosaico de 1, 2 o 4), lectura de todos a la vez,
-  pool de workers, detector nativo del sistema cuando existe y recorte automático a la pantalla
-  del emisor a resolución nativa.
-- **Más y mayores archivos:** varios archivos por envío (paquete cifrado, «guardar todo» en ZIP),
-  límite de 8 a 32 MB y QR que llenan su versión (+12,5 % de datos por QR con el mismo código).
-- **Interfaz terminal compacta** con mapa de fragmentos en vivo.
-- **Robustez:** un fotograma manipulado en un relevo ya no bloquea el envío legítimo.
+## Reglas
 
-**El formato de fotograma no cambia** (v1): 0.0.1a y 0.1.0 leen lo que emite 0.2.0 y viceversa.
-Un envío de varios archivos llega a una versión antigua como un único archivo `.szpk`.
+**Tablero:** 8x8 con rocas colocadas en simetría, para que ningún lado tenga ventaja. Cada jugador empieza con su capital en una esquina y dos peones. Cada uno ve su capital abajo a la izquierda (a1), como en el ajedrez.
 
-## Uso
+**Ronda:** tienes 3 acciones. Cada acción coloca una unidad o levanta un edificio. Nadie ve tu jugada hasta que los dos confirmáis.
 
-**send.** Elige uno o varios archivos (32 MB en total), escribe una clave (mín. 8 caracteres),
-elige el tamaño de QR y cuántos por pantalla, y pulsa *preparar envío*. La estimación muestra el
-tiempo mínimo. Opcionalmente, las fotos JPEG/PNG se recomprimen a WebP (con pérdida, mucho
-menos tiempo). Desde el carrusel puedes ponerlo a pantalla completa, exportar un **GIF** (hasta
-3000 fotogramas) o una **bolsa `.szb`**.
+**Unidades:** el color indica el tipo y el símbolo de ajedrez permite distinguirlas sin color.
 
-**scan.** Activa la cámara y apunta a la pantalla del emisor, o importa GIF, capturas (con uno o
-varios QR) o bolsas. El HUD muestra el motor, los análisis por segundo, los QR por segundo y los
-píxeles por módulo; si avisa «acerca la cámara», acércala. El mapa enciende cada bloque recibido.
+| Unidad | Fuerza | Vence a | Especial |
+|---|---|---|---|
+| ♟ Peón | 1 | — | Barato. Expande y paga edificios |
+| ♜ Infantería | 2 | Caballería | +1 al defender |
+| ♞ Caballería | 2 | Arqueros | Llega a dos casillas de distancia |
+| ♝ Arqueros | 2 | Infantería | +1 al atacar |
 
-**dex.** Cada envío es una fila con su progreso. Cuando está completo («clave»), ábrelo, escribe
-la clave y revisa el contenido: vista previa de texto, imagen, audio, vídeo o PDF tras verificar
-el SHA-256. Con varios archivos puedes ver o guardar cada uno, o todos en un ZIP. Atajos de
-teclado: `1`, `2`, `3`.
+La ventaja del triángulo suma +2: es una bonificación, no una victoria automática (idea tomada de Fire Emblem).
 
-Para ejecutarla, sirve la carpeta con cualquier servidor estático (la cámara exige HTTPS o
-`localhost`):
+**Dónde colocar:** en tus casillas (cambia la guarnición y la anterior vuelve a tu reserva) o en las vecinas.
 
-```sh
-npm install      # solo para los tests
-npm test         # 26 pruebas
-npm start        # python3 -m http.server 8080
+**Combate:**
+- Atacante: base, ventaja, arqueros y flanqueo (+1 por cada casilla tuya vecina al objetivo a partir de la segunda, máximo +2).
+- Defensor: base, ventaja, infantería, muralla (+2), capital (+2) y apoyo (+1 por cada casilla propia vecina a partir de la segunda, máximo +2). Idea tomada del "support" de Diplomacy.
+- **El defensor gana los empates**, como en Risk.
+- Si los dos jugadores envían unidades distintas a una casilla libre, gana la más fuerte. Si tienen la misma fuerza, chocan y la casilla sigue libre (el "bounce" de Diplomacy).
+
+**Casilla negra:** si los dos enviáis la **misma unidad** a la misma casilla en la misma ronda, se quema y nadie podrá ocuparla nunca. Las capitales no se queman: en ese caso, el defensor la conserva.
+
+**Suministro:** al final de cada ronda, las casillas que no estén unidas a tu capital por casillas tuyas se pierden y vuelven a ser libres. Cortar un pasillo estrecho puede hundir una región entera, y las casillas negras sirven para cerrar pasos.
+
+**Edificios** (en casillas tuyas, no en la capital, pagados con peones):
+
+| Edificio | Coste | Efecto |
+|---|---|---|
+| ❋ Granja | 2 | +1 peón cada ronda |
+| ⚑ Cuartel | 3 | +1 unidad del tipo que guarnece la casilla cada ronda |
+| ▦ Muralla | 3 | +2 a la defensa de la casilla |
+
+Si pierdes la casilla, pierdes el edificio.
+
+**Refuerzos por ronda:** 1 peón por cada 3 casillas (mínimo 3), 1 soldado por cada 5 casillas, 1 soldado de la capital (rota entre infantería, caballería y arqueros), la producción de los edificios y 1 soldado de botín si has capturado terreno rival.
+
+**Victoria:**
+- Tomar la capital rival.
+- Controlar el 65% de las casillas jugables.
+- O tener más puntos al terminar la ronda 20 (1 por casilla y 2 por edificio). Desempate: casillas y después soldados.
+
+## Interfaz
+
+- Mobile-first y táctil: botones de 44 px o más, controles en la zona del pulgar, vibración al colocar y en las casillas negras.
+- Tus casillas son claras (marfil) y las del rival, oscuras (grafito). El color se reserva para el tipo de unidad.
+- La lista de órdenes muestra el resultado previsto de cada ataque ("5 contra 2: la tomas si no cambia su guarnición").
+- Al tocar una casilla ocupada ves la cuenta exacta de ataque y defensa contra cada unidad.
+- Revelado animado casilla a casilla e informe de ronda con cada choque, captura, corte o casilla negra.
+- Respeta "reducir movimiento" del sistema.
+
+## PvP por WebRTC
+
+1. Un jugador pulsa **Crear sala** y comparte el código de cinco caracteres o el enlace.
+2. El otro pulsa **Unirse** y escribe el código, o abre el enlace.
+3. La conexión es directa entre los dos móviles (PeerJS sobre WebRTC). No hay servidor que decida nada: los dos ejecutan el mismo motor determinista.
+
+**Juego limpio sin servidor:**
+- **Semilla compartida:** cada jugador se compromete con una mitad aleatoria (hash) y luego la revela. Ninguno puede elegir el tablero.
+- **Compromiso y revelado en cada ronda:** primero se envía el hash de la jugada con un valor aleatorio, y solo cuando los dos han confirmado se revelan. Nadie puede cambiar su jugada después de ver la del rival.
+- **Validación:** cada jugada revelada se comprueba contra las reglas.
+- **Estado verificado:** tras cada ronda, los dos comparan el hash del tablero. Si no coincide, la partida se detiene.
+- **Reconexión:** si el invitado pierde la conexión, reintenta cada 3 segundos. Al volver, el anfitrión le envía el historial y el invitado reconstruye y verifica la partida.
+- **Tiempo:** 60 segundos por ronda. Al agotarse se envía lo que tuvieras planeado.
+
+## Ejecutar
+
+**Lo más rápido:** descomprime y abre `index.html` con doble clic. Funciona la partida contra el bot y se guarda en el navegador.
+
+Para PvP, instalar la app y usarla sin conexión hace falta servirla por HTTP o HTTPS:
+
+```bash
+npm start          # sirve en http://localhost:8080
+npm test           # 25 tests: motor y protocolo PvP
+npm run sim        # simulador de balance (bots)
 ```
 
-No hay paso de compilación. Librerías en `vendor/`: `qrcode` 1.5.4 (MIT, IIFE) y `jsQR` 1.4.0
-(Apache-2.0, licencia en `vendor/jsQR.LICENSE`).
+**Si cambias el código de `src/`**, regenera el script que carga la página:
 
-## Cómo es tan rápido el escaneo
-
-1. **Mosaico.** El emisor muestra 2 o 4 QR distintos por pantalla: cada pantalla lleva 2 o 4 veces
-   más datos con la misma frecuencia de refresco, que suele ser el cuello de botella real.
-2. **Lectura de varios QR.** jsQR no lee nada si hay varios códigos en la imagen. SHUMZU localiza
-   la zona clara de la pantalla del emisor, la divide en celdas (1×2, 2×1 o 2×2, con un 4 % de
-   solape) y decodifica cada una; recuerda la cuadrícula que funcionó.
-3. **Detector nativo.** Donde existe `BarcodeDetector` (Chrome Android, ChromeOS, macOS) se usa ese,
-   acelerado por el sistema y capaz de leer todos los QR de una vez.
-4. **ROI a resolución nativa.** El primer análisis va reducido (960 px); en cuanto se localiza la
-   pantalla del emisor, se recorta esa zona sin reducir: más píxeles por módulo y menos píxeles
-   totales.
-5. **Pool sin cola.** Hasta 3 workers; un fotograma de cámara solo se envía si hay uno libre.
-   Cuando el navegador lo permite, los fotogramas pasan como `ImageBitmap` transferible, sin
-   `getImageData` en el hilo principal; si no, se usa un lienzo como antes.
-6. **Fuente sistemática y sin repeticiones.** Los K primeros fotogramas son los bloques en claro;
-   después, combinaciones nuevas sin fin: cualquier fotograma nuevo sirve.
-
-### Medidas con cámara simulada
-
-Vídeo Y4M con desenfoque y ruido inyectado como cámara en Chromium headless. Contenedor de
-**2 núcleos** (un solo worker, entorno de gama baja). Envío de 6,5 KB (K=30 bloques, S=225, v10),
-emisor a 10 pantallas/s. Tiempo hasta completar, contando el arranque de la cámara; todas las
-pasadas descifraron correctamente.
-
-| Escenario | 1 QR/pantalla | 2 QR | 4 QR |
-|---|---:|---:|---:|
-| Cámara 1920×1080, pantalla del emisor a 460 px | 3,4 s · 7,1 px/mód | 2,8–3,4 s | **2,0–2,1 s** · 3,5 px/mód |
-| Cámara 1080×1920, pantalla del emisor a 648 px | 4,6–5,9 s · 10 px/mód | — | **2,3 s** · 5 px/mód |
-
-Lectura sostenida: 6–14 QR/s con 1 por pantalla y 18–39 QR/s con 4. «—»: el simulador de Chromium
-recorta el vídeo vertical a 1080×1080 y corta el mosaico vertical de 2; no es un fallo de la app.
-
-**No medido:** cámaras reales (enfoque, moiré, reflejos, pulso), el detector nativo (no existe en
-Chromium para Linux) y dispositivos con más núcleos.
-
-## Tamaños de QR
-
-Cada tamaño es el máximo que cabe en su versión (nivel L, modo alfanumérico), medido con la
-librería `qrcode`:
-
-| Preset | S (bytes) | Caracteres | QR | Módulos | Carga útil |
-|---|---:|---:|---:|---:|---:|
-| v8 | 148 | 279 | 8 | 49 | 80 % |
-| v10 (por defecto) | 225 | 395 | 10 | 57 | 86 % |
-| v13 | 374 | 618 | 13 | 69 | 91 % |
-| v17 | 587 | 938 | 17 | 85 | 94 % |
-| v20 | 794 | 1248 | 20 | 97 | 95 % |
-
-## Formato
-
-```
-archivo(s) ─► [paquete SZPK si son varios] ─► cabecera (nombre, tipo, tamaño, SHA-256)
-          ─► deflate si reduce ─► AES-256-GCM (PBKDF2-SHA256, 310 000 iteraciones, sal = sesión)
-          ─► K bloques de S bytes ─► fuente LT sistemática ─► fotograma ─► base45 ─► QR nivel L
+```bash
+npm install        # solo la primera vez (instala esbuild)
+npm run build      # genera app.bundle.js
 ```
 
-### Fotograma (binario, big-endian, sin cambios desde 0.0.1a)
+`index.html` carga `app.bundle.js`, un único script normal. Se hace así porque los navegadores bloquean los módulos de JavaScript cuando el HTML se abre con doble clic (`file://`).
 
-| offset | tamaño | campo |
-|-------:|-------:|---|
-| 0 | 2 | magia `SZ` |
-| 2 | 1 | versión de formato (`1`) |
-| 3 | 1 | banderas: bit0 cifrado, bit1 deflate |
-| 4 | 16 | id de sesión (también sal de PBKDF2) |
-| 20 | 4 | K, número de bloques |
-| 24 | 2 | S, bytes por bloque |
-| 26 | 4 | L, longitud real del flujo cifrado |
-| 30 | 4 | semilla |
-| 34 | S | carga = XOR de los bloques indicados |
-| 34+S | 4 | CRC-32 |
+Para PvP entre móviles hay que publicarlo en HTTPS (por ejemplo, Vercel: basta con subir la carpeta, no tiene build). El service worker y la instalación como app también necesitan HTTPS.
 
-### Paquete multiarchivo (dentro del cifrado)
+**Probar el PvP en un solo ordenador sin internet:** abre `http://localhost:8080/?dev=bc` en dos pestañas, crea la sala en una y únete en la otra. Usa BroadcastChannel en lugar de WebRTC, con el mismo protocolo.
 
-`"SZPK"` · u8 versión · u32 número · por archivo: u16 + nombre UTF-8 · u8 + tipo · u32 tamaño ·
-datos. Tipo MIME del envío: `application/x-shumzu-pack`.
+## Verificado en esta versión
 
-### Bolsa `.szb`
+- 25 tests unitarios: reglas, casillas negras, suministro, edificios, victoria, repetición desde el historial, sincronización PvP, detección de trampas (jugada cambiada tras confirmar, jugada ilegal), rendición y reconexión.
+- PvP de extremo a extremo en navegador con dos páginas (BroadcastChannel): 8 rondas sin ningún desajuste de estado.
+- Pantallas de 390x844 y 375x667 sin desbordamiento.
+- Funcionamiento sin conexión con el service worker.
 
-`"SZB1"` · u32 número de fotogramas · por cada uno: u16 longitud + fotograma. Se deduplican por
-variante (sesión+K+S+L) y semilla; no contienen nada en claro.
+## Balance (simulado, `npm run sim`)
 
-### Almacenamiento local
+| Emparejamiento | Resultado |
+|---|---|
+| Normal contra Normal | Equilibrado (101 frente a 98 en 200 partidas) |
+| Normal contra Fácil | Normal gana el 100% |
+| Fácil contra Azar | Fácil gana el 100% |
 
-IndexedDB `shumzu` / `frames`, una fila por fotograma con clave `sesión.K.S.L:semilla`. Las claves
-de 0.1.0 (`sesión:semilla`) y el `localStorage` de 0.0.1a se migran solos al arrancar.
+Lo aprendido al ajustar:
+- Sin apoyo defensivo ni suministro, las casillas cambiaban de dueño sin fin y casi todo acababa en empate.
+- El bot que siempre elige la jugada "óptima" pierde contra uno más variado: con órdenes simultáneas, ser predecible se castiga.
 
-## Seguridad
+## Limitaciones conocidas
 
-- Cifrado autenticado (AES-GCM). Una clave incorrecta se detecta al final y no entrega datos.
-- Nombres, tipos y lista de archivos van **dentro** del cifrado. En claro: K, S, L y la sesión.
-- Un fotograma manipulado (misma sesión, otros parámetros) abre una variante aparte, marcada con
-  ≠ en la lista, en vez de bloquear el envío legítimo.
-- La vista previa solo muestra imágenes raster, audio, vídeo y PDF; SVG y HTML se descargan.
-- El service worker solo cachea recursos propios, nunca datos del usuario.
+- **WebRTC real sin probar aquí:** el entorno de desarrollo no tiene acceso a internet, así que la conexión PeerJS no se ha probado entre dos móviles. El protocolo sí está probado de extremo a extremo con otro transporte. Es lo primero que hay que comprobar al publicarlo.
+- **Redes estrictas:** solo se usa STUN. Algunas redes móviles o corporativas necesitan un servidor TURN; se puede configurar con `window.SEMBRADO_ICE`.
+- **Emparejamiento:** usa el servidor público gratuito de PeerJS, sin garantías de disponibilidad.
+- **Bots simétricos:** entre bots iguales casi todas las partidas llegan a la ronda 20 y se deciden por puntos. Con humanos debería haber más variedad, pero hay que comprobarlo jugando.
+- **Defender rinde menos que atacar** según la simulación. Es el siguiente punto de balance.
+- **Reconexión antes de empezar** la partida no está cubierta; solo durante la partida.
+- **Ligera ventaja del lado B** en algunas tandas de simulación (55% frente a 45%), dentro del margen del ruido. Conviene vigilarla.
 
-**Limitaciones** (ver `AUDITORIA.md`): cabecera sin autenticar y PBKDF2 fijo en 310 000 iteraciones
-(cambiarlo exige formato v2); sin firma de origen; el tamaño aproximado del envío es visible.
+## Estructura
 
-## Pruebas
+```
+index.html               Pantallas
+manifest.webmanifest     PWA
+sw.js                    Service worker (sin conexión)
+icons/                   Iconos de la app
+src/engine/rules.js      Unidades, edificios y números del juego
+src/engine/game.js       Motor determinista: validación, combate, suministro, victoria
+src/engine/bot.js        Bot (normal y fácil)
+src/engine/sha256.js     SHA-256 síncrono (funciona también sin HTTPS)
+src/engine/rng.js        Aleatoriedad con semilla
+src/net/session.js       Protocolo PvP: semilla, compromiso y revelado, verificación
+src/net/transports.js    PeerJS (WebRTC), BroadcastChannel y transporte en memoria
+src/ui/app.js            Interfaz
+src/ui/styles.css        Estilos
+tests/                   Tests
+tools/simulate.mjs       Simulador de balance
+```
 
-- `test/roundtrip.test.mjs` y `test/gif.test.mjs` (de 0.0.1a, sin cambios).
-- `test/v020.test.mjs`: versión QR real de cada tamaño, archivo de 12 MiB, recuento ajustado para
-  GIF/bolsa con un 8 % de pérdida, variantes envenenadas, paquete multiarchivo (también a través
-  del cifrado), ZIP, mosaicos 2×2 y 1×2, mosaico dentro de un encuadre de cámara, base45 optimizado
-  y 150 000 fotogramas en el almacén.
+## Changelog
 
-Verificado además en Chromium headless (390 px y 1280 px, sin errores de consola): envío de dos
-archivos en mosaico de 4, lectura de los 4 QR de una captura del emisor, bolsa, descifrado, ZIP
-validado con Python (contenido idéntico byte a byte), migración de claves de IndexedDB de 0.1.0,
-service worker y recarga sin red, y la cámara simulada de la tabla anterior.
+### 0.0.1 (corrección)
+- El juego funciona al abrir `index.html` con doble clic: todo el código va en `app.bundle.js`. Antes, los botones no respondían fuera de un servidor.
 
-## Pendientes
-
-- Licencia: `LICENSE` es MIT **provisional**. Confirmar antes de publicar.
-- Probar con cámaras reales y medir el detector nativo en Android.
-- Formato v2: cabecera autenticada (AAD), parámetros de derivación en cabecera, cabecera compacta.
-- Fuente RaptorQ (RFC 6330) para reducir la sobrecarga con pérdidas.
-- Multiplexado por color (3 QR en los canales R, G y B): ×3 teórico, frágil con cámaras reales.
+### 0.0.1
+- Primera versión jugable: tablero 8x8, cuatro unidades con triángulo de ventaja, casillas negras, suministro, tres edificios, refuerzos estilo Risk y tres formas de ganar.
+- Bot en dos niveles y partida guardada en el dispositivo.
+- PvP por WebRTC con compromiso y revelado, verificación del estado por ronda y reconexión.
+- PWA instalable con funcionamiento sin conexión.

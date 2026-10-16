@@ -1,19 +1,20 @@
 {
-  "name": "shumzu",
-  "version": "0.2.0",
-  "description": "Transferencia de archivos cifrados por códigos QR y por bolsas de proximidad. Sin servidores.",
+  "name": "sembrado",
+  "version": "0.0.1",
   "private": true,
+  "description": "Estrategia por casillas para dos jugadores con órdenes simultáneas. PWA con PvP por WebRTC.",
   "type": "module",
-  "license": "MIT",
   "scripts": {
-    "test": "node --test test/roundtrip.test.mjs test/gif.test.mjs test/v020.test.mjs",
-    "check": "node --check js/app.js && node --check js/visual.js && node --check js/store.js && node --check js/decoder.js && node --check js/scan.js && node --check js/workers/decode.worker.js && node --check js/workers/multiqr.js && node --check js/core/pack.js && node --check js/core/zip.js && node --check sw.js",
-    "start": "python3 -m http.server 8080"
+    "build": "esbuild src/ui/app.js --bundle --format=iife --target=es2020 --outfile=app.bundle.js --legal-comments=none",
+    "start": "python3 -m http.server 8080",
+    "test": "node --test tests/engine.test.mjs tests/session.test.mjs",
+    "sim": "node tools/simulate.mjs"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=18"
   },
+  "license": "UNLICENSED",
   "devDependencies": {
-    "qrcode": "^1.5.4"
+    "esbuild": "0.24.0"
   }
 }

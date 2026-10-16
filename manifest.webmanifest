@@ -1,20 +1,17 @@
 {
-  "name": "SHUMZU",
-  "short_name": "SHUMZU",
-  "description": "Transferencia de archivos cifrados por códigos QR. Sin servidores.",
+  "name": "Sembrado",
+  "short_name": "Sembrado",
+  "description": "Estrategia por casillas para dos jugadores con órdenes simultáneas.",
+  "lang": "es",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#0a0716",
-  "theme_color": "#0a0716",
-  "lang": "es",
+  "background_color": "#1f2a2e",
+  "theme_color": "#1f2a2e",
   "icons": [
-    {
-      "src": "icons/icon.svg",
-      "sizes": "any",
-      "type": "image/svg+xml",
-      "purpose": "any"
-    }
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ]
 }

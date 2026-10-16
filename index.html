@@ -1,194 +1,100 @@
 <!doctype html>
 <html lang="es">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#0a0716">
-  <meta name="color-scheme" content="dark">
-  <meta name="description" content="Transferencia de archivos cifrados por códigos QR. Sin servidores.">
-  <title>SHUMZU</title>
-  <link rel="manifest" href="manifest.webmanifest">
-  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="css/styles.css">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#1f2a2e" />
+  <meta name="description" content="Estrategia por casillas para dos jugadores con órdenes simultáneas." />
+  <title>Sembrado</title>
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" href="icons/icon-192.png" />
+  <link rel="apple-touch-icon" href="icons/icon-192.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Semi+Condensed:wght@500;600;700&display=swap" />
+  <link rel="stylesheet" href="src/ui/styles.css" />
 </head>
 <body>
-  <header class="bar" role="banner">
-    <span class="brand"><b>shumzu</b><small>0.2.0</small></span>
-    <span class="bar-stats" aria-live="polite">
-      <span><b id="st-entries">0</b> env</span>
-      <span><b id="st-done">0</b> ok</span>
-      <span><b id="st-frames">0</b> frg</span>
-    </span>
-    <span id="conn" class="conn" data-online="true">local</span>
-  </header>
+  <!-- Home -->
+  <section id="screen-home" class="screen home active" aria-label="Inicio">
+    <header>
+      <h1>Sembrado</h1>
+      <p class="lede">Conquista el tablero antes que tu rival. Los dos ordenáis a la vez y en secreto.</p>
+    </header>
 
-  <main>
-    <!-- ───────── dex ───────── -->
-    <section id="v-dex" class="view active" aria-label="Capturas">
-      <div class="prompt-row">
-        <label class="prompt" for="dex-filter"><span class="ps1">~/capturas $</span>
-          <input id="dex-filter" type="search" placeholder="filtrar por nombre o sesión" autocomplete="off" spellcheck="false">
-        </label>
-        <button id="dex-bag" class="btn ghost" type="button" disabled title="Exportar todos los fragmentos en una bolsa .szb">relevo</button>
+    <figure style="margin:0">
+      <div class="clash" aria-hidden="true">
+        <div class="tile mine"><span class="chip inf">♜&#xFE0E;</span></div>
+        <div class="tile black"></div>
+        <div class="tile foe"><span class="chip inf">♜&#xFE0E;</span></div>
       </div>
-      <p class="summary" id="dex-summary"></p>
-      <ol id="dex-list" class="ls" aria-label="Envíos capturados"></ol>
-      <div id="dex-empty" class="empty">
-        <pre class="empty-art" aria-hidden="true">  ┌─┐┌─┐
-  │▚│ │▞│
-  └─┘└─┘</pre>
-        <p>Aún no hay capturas.</p>
-        <p class="dim">Abre <button class="link" type="button" data-goto="v-scan">scan</button> y apunta a los QR, o importa un GIF de códigos.</p>
+      <figcaption class="clash-caption">Si los dos enviáis la misma unidad a la misma casilla, se quema y nadie podrá tomarla.</figcaption>
+    </figure>
+
+    <nav class="menu" aria-label="Modos de juego">
+      <button id="btn-continue" class="btn primary" hidden>Continuar partida</button>
+      <div class="seg" role="group" aria-label="Dificultad del bot">
+        <button data-level="facil" aria-pressed="false">Fácil</button>
+        <button data-level="normal" aria-pressed="true">Normal</button>
       </div>
-    </section>
-
-    <!-- ───────── scan ───────── -->
-    <section id="v-scan" class="view" aria-label="Capturar">
-      <div class="scan-main">
-      <div id="scanner" class="scanner">
-        <video id="cam" playsinline muted hidden></video>
-        <div class="reticle" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
-        <div id="hud" class="hud" aria-live="off">cámara apagada</div>
-        <div class="scanner-idle" id="scanner-idle">
-          <button id="cam-btn" class="btn primary" type="button">activar cámara</button>
-        </div>
+      <button id="btn-bot" class="btn primary">Jugar contra el bot</button>
+      <div class="row2">
+        <button id="btn-host" class="btn">Crear sala</button>
+        <button id="btn-join" class="btn">Unirse</button>
       </div>
-      <div class="row tools">
-        <button id="cam-stop" class="btn" type="button" hidden>detener</button>
-        <button id="torch-btn" class="btn" type="button" hidden aria-pressed="false">linterna</button>
-        <button id="imp-btn" class="btn" type="button">importar GIF / capturas</button>
-        <input id="imp-input" type="file" accept="image/*" multiple hidden>
+      <button id="btn-rules" class="btn quiet">Cómo se juega</button>
+      <button id="btn-install" class="btn quiet" hidden>Instalar en el móvil</button>
+    </nav>
+
+    <footer>Versión <span id="version"></span>. PvP directo entre móviles con WebRTC.</footer>
+  </section>
+
+  <!-- Game -->
+  <section id="screen-game" class="screen game" aria-label="Partida">
+    <div class="topbar">
+      <button id="btn-menu" class="icon-btn" aria-label="Menú de partida">☰</button>
+      <div class="round num" id="round-label"></div>
+      <div class="phase" id="phase" data-phase="plan" role="status">
+        <span class="dot"></span><span id="phase-text">Planifica</span><span class="timer" id="timer"></span>
       </div>
+      <button id="btn-help" class="icon-btn" aria-label="Leyenda y reglas">?</button>
+    </div>
 
-      <div id="drop" class="drop" tabindex="0" role="button" aria-label="Soltar archivos GIF o capturas">
-        suelta aquí GIF, capturas con QR o bolsas .szb <span id="imp-state" class="dim"></span>
+    <div class="player foe">
+      <span class="swatch" aria-hidden="true"></span>
+      <div class="who"><span class="name" id="foe-name">Rival</span><span class="sub" id="foe-status"></span></div>
+      <div class="cells"><b class="num" id="cells-foe">0</b><span class="sub" id="share-foe"></span></div>
+    </div>
+
+    <div class="board" id="board" role="grid" aria-label="Tablero"></div>
+
+    <div class="player me">
+      <span class="swatch" aria-hidden="true"></span>
+      <div class="who"><span class="name">Tú</span><span class="sub" id="me-income"></span></div>
+      <div class="cells"><b class="num" id="cells-me">0</b><span class="sub" id="share-me"></span></div>
+    </div>
+
+    <div class="orders-wrap"><ol class="orders" id="orders" aria-label="Tus órdenes de esta ronda"></ol></div>
+
+    <div class="dock">
+      <div class="hint" id="hint" aria-live="polite"></div>
+      <div class="tray" id="tray" role="toolbar" aria-label="Unidades y edificios"></div>
+      <div class="actions">
+        <div class="pips" id="pips" aria-label="Acciones usadas"></div>
+        <button id="btn-confirm" class="btn primary">Confirmar jugada</button>
       </div>
-      </div>
+    </div>
+  </section>
 
-      <div class="scan-side">
-      <figure class="fmap-box" id="scan-map-box" hidden>
-        <figcaption><span id="scan-map-title"></span><span id="scan-map-count" class="num"></span></figcaption>
-        <canvas id="scan-map" class="fmap" aria-label="Mapa de fragmentos del envío activo"></canvas>
-      </figure>
+  <div class="scrim" id="scrim"></div>
+  <div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-title">
+    <div class="grab"></div>
+    <div id="sheet-body"></div>
+  </div>
+  <div class="toast" id="toast" role="status"></div>
 
-      <details class="paste">
-        <summary>pegar un fotograma como texto</summary>
-        <textarea id="paste-text" rows="3" spellcheck="false" placeholder="8OAY…"></textarea>
-        <button id="paste-btn" class="btn" type="button">añadir fotograma</button>
-      </details>
-
-      <ol id="log" class="log" aria-label="Registro" aria-live="polite"></ol>
-      </div>
-    </section>
-
-    <!-- ───────── send ───────── -->
-    <section id="v-send" class="view" aria-label="Enviar">
-      <form id="s-form" class="form" autocomplete="off" onsubmit="return false">
-        <div class="field">
-          <span class="key">archivos</span>
-          <div id="send-drop" class="drop small" tabindex="0" role="button" aria-label="Elegir archivos">
-            <span id="s-fname">elige o suelta archivos · máx. 32 MB en total</span>
-          </div>
-          <input id="s-file" type="file" multiple hidden>
-          <ul id="s-files" class="filelist"></ul>
-        </div>
-
-        <label class="field" for="s-pass">
-          <span class="key">clave</span>
-          <span class="inline">
-            <input id="s-pass" type="password" minlength="8" required placeholder="mínimo 8 caracteres" autocomplete="new-password" spellcheck="false">
-            <button id="s-eye" class="btn ghost" type="button" aria-pressed="false">ver</button>
-          </span>
-        </label>
-
-        <div class="field">
-          <span class="key">qr</span>
-          <div id="s-size" class="seg" role="radiogroup" aria-label="Tamaño de QR"></div>
-        </div>
-
-        <div class="field">
-          <span class="key">mosaico</span>
-          <div id="s-mosaic" class="seg" role="radiogroup" aria-label="QR por pantalla">
-            <button type="button" role="radio" data-n="1" aria-checked="false">1</button>
-            <button type="button" role="radio" data-n="2" aria-checked="true" class="on">2</button>
-            <button type="button" role="radio" data-n="4" aria-checked="false">4</button>
-          </div>
-        </div>
-
-        <label class="field check" for="s-webp">
-          <span class="key">fotos</span>
-          <span class="inline"><input id="s-webp" type="checkbox"> recomprimir JPEG/PNG a WebP (con pérdida, mucho menos tiempo)</span>
-        </label>
-
-        <p id="s-est" class="est"></p>
-        <p id="s-err" class="err" role="alert" hidden></p>
-        <button id="s-go" class="btn primary wide" type="button">preparar envío</button>
-      </form>
-
-      <div id="s-out" class="out" hidden>
-        <div id="s-stage" class="stage">
-          <canvas id="s-canvas" aria-label="Códigos QR del envío"></canvas>
-        </div>
-        <div class="kv">
-          <span>bloques <b id="k-k">0</b></span>
-          <span>seed <b id="k-seed">0</b></span>
-          <span>emitido <b id="k-t">0 s</b></span>
-          <span>mínimo <b id="k-min">–</b></span>
-        </div>
-        <div class="row">
-          <button id="s-play" class="btn" type="button">pausa</button>
-          <label class="slider">fps <input id="s-speed" type="range" min="2" max="20" value="8"><b id="s-fps-label">8</b></label>
-          <button id="s-full" class="btn" type="button">pantalla completa</button>
-        </div>
-        <div class="row">
-          <button id="s-gif" class="btn ghost" type="button">GIF</button>
-          <button id="s-bag" class="btn ghost" type="button">bolsa .szb</button>
-          <button id="s-new" class="btn ghost" type="button">nuevo envío</button>
-        </div>
-        <p class="dim small" id="s-tip">Mantén la pantalla al máximo brillo. El receptor puede empezar en cualquier momento: cada fotograma nuevo sirve.</p>
-      </div>
-    </section>
-  </main>
-
-  <nav class="tabs" aria-label="Secciones">
-    <button class="tab active" data-view="v-dex" aria-selected="true"><kbd>1</kbd>dex</button>
-    <button class="tab" data-view="v-scan" aria-selected="false"><kbd>2</kbd>scan</button>
-    <button class="tab" data-view="v-send" aria-selected="false"><kbd>3</kbd>send</button>
-  </nav>
-
-  <dialog id="detail" aria-labelledby="d-title">
-    <form method="dialog" class="sheet">
-      <header class="sheet-head">
-        <span><b id="d-num"></b> <span id="d-src" class="tag"></span></span>
-        <button class="btn ghost" value="close" aria-label="Cerrar">cerrar</button>
-      </header>
-      <h2 id="d-title"></h2>
-      <p class="mono-id">sesión <code id="d-sid"></code></p>
-      <figure class="fmap-box">
-        <figcaption><span>fragmentos</span><span class="num"><b id="d-solved">0</b>/<b id="d-k">0</b> · <b id="d-frames">0</b> recibidos</span></figcaption>
-        <canvas id="d-map" class="fmap"></canvas>
-      </figure>
-      <p id="d-hint" class="dim"></p>
-      <div id="d-lock" class="lock" hidden>
-        <label for="d-pass" class="key">clave</label>
-        <span class="inline">
-          <input id="d-pass" type="password" autocomplete="off" spellcheck="false">
-          <button id="d-decrypt" class="btn primary" type="button">descifrar</button>
-        </span>
-        <p id="d-err" class="err" role="alert" hidden></p>
-      </div>
-      <div id="d-files" class="files" hidden></div>
-      <div id="d-preview" class="preview"></div>
-      <div class="row end">
-        <button id="d-bag" class="btn ghost" type="button">bolsa .szb</button>
-        <button id="d-del" class="btn danger" type="button">borrar</button>
-      </div>
-    </form>
-  </dialog>
-
-  <div id="toast" class="toast" role="status" hidden></div>
-
-  <script src="vendor/qrcode.bundle.js" defer></script>
-  <script type="module" src="js/app.js"></script>
+  <!-- A single classic script so the game also works when index.html is opened by double-click (file://).
+       Generated from src/ with `npm run build`. -->
+  <script src="app.bundle.js"></script>
 </body>
 </html>
