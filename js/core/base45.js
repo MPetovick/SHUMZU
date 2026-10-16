@@ -5,7 +5,9 @@
 // en el código QR es ~3 % sobre el binario puro, frente a ~33 % de base64.
 
 const CHARSET = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ $%*+-./:';
-const REVERSE = new Map([...CHARSET].map((c, i) => [c, i]));
+// Tabla por código ASCII (más rápida que un Map en el bucle de decodificación).
+const LOOKUP = new Int8Array(128).fill(-1);
+for (let i = 0; i < CHARSET.length; i++) LOOKUP[CHARSET.charCodeAt(i)] = i;
 
 export function b45encode(bytes) {
   let out = '';
@@ -23,26 +25,30 @@ export function b45encode(bytes) {
 
 export function b45decode(text) {
   const value = (c) => {
-    const v = REVERSE.get(c);
-    if (v === undefined) throw new Error('base45: carácter no válido');
+    const code = c.charCodeAt(0);
+    const v = code < 128 ? LOOKUP[code] : -1;
+    if (v < 0) throw new Error('base45: carácter no válido');
     return v;
   };
-  const out = [];
+  const full = Math.floor(text.length / 3);
+  const rest = text.length - full * 3;
+  if (rest === 1) throw new Error('base45: longitud no válida');
+  // Búfer preasignado: 0.0.1a acumulaba en un array JS y copiaba al final.
+  const out = new Uint8Array(full * 2 + (rest === 2 ? 1 : 0));
+  let o = 0;
   let i = 0;
   for (; i + 2 < text.length; i += 3) {
     const n = value(text[i]) + value(text[i + 1]) * 45 + value(text[i + 2]) * 2025;
     if (n > 65535) throw new Error('base45: grupo fuera de rango');
-    out.push(n >> 8, n & 255);
+    out[o++] = n >> 8;
+    out[o++] = n & 255;
   }
-  const rest = text.length - i;
   if (rest === 2) {
     const n = value(text[i]) + value(text[i + 1]) * 45;
     if (n > 255) throw new Error('base45: grupo fuera de rango');
-    out.push(n);
-  } else if (rest === 1) {
-    throw new Error('base45: longitud no válida');
+    out[o] = n;
   }
-  return Uint8Array.from(out);
+  return out;
 }
 
 export const B45_CHARSET = CHARSET;

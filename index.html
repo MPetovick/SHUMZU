@@ -3,194 +3,192 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="color-scheme" content="dark light">
-  <meta name="theme-color" content="#0b0d12" media="(prefers-color-scheme: dark)">
-  <meta name="theme-color" content="#f3f5fb" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0a0716">
+  <meta name="color-scheme" content="dark">
   <meta name="description" content="Transferencia de archivos cifrados por códigos QR. Sin servidores.">
-  <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="SHUMZU">
   <title>SHUMZU</title>
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
-<div class="app">
-
-  <header class="bar">
-    <div class="brand">
-      <span class="logo" aria-hidden="true"></span>
-      <div>
-        <b>SHUMZU</b>
-        <small>v0.1.0</small>
-      </div>
-    </div>
-    <div class="conn" id="conn" data-online="true">Todo local</div>
+  <header class="bar" role="banner">
+    <span class="brand"><b>shumzu</b><small>0.2.0</small></span>
+    <span class="bar-stats" aria-live="polite">
+      <span><b id="st-entries">0</b> env</span>
+      <span><b id="st-done">0</b> ok</span>
+      <span><b id="st-frames">0</b> frg</span>
+    </span>
+    <span id="conn" class="conn" data-online="true">local</span>
   </header>
 
-  <section class="stats" aria-label="Resumen">
-    <div class="stat"><b id="st-entries">0</b><span>entradas</span></div>
-    <div class="stat"><b id="st-done">0</b><span>completas</span></div>
-    <div class="stat"><b id="st-frames">0</b><span>fotogramas</span></div>
-    <div class="stat"><b id="st-open">0</b><span>activas</span></div>
-  </section>
-
   <main>
-    <!-- POKÉDEX -->
-    <section id="v-dex" class="view active" aria-label="Pokédex">
-      <div class="toolbar">
-        <input id="dex-filter" type="search" placeholder="Buscar por nombre o sesión" autocomplete="off" enterkeyhint="search">
-        <button id="dex-bag" class="ghost" disabled title="Exportar todo lo capturado para relevo en malla">Relevo</button>
+    <!-- ───────── dex ───────── -->
+    <section id="v-dex" class="view active" aria-label="Capturas">
+      <div class="prompt-row">
+        <label class="prompt" for="dex-filter"><span class="ps1">~/capturas $</span>
+          <input id="dex-filter" type="search" placeholder="filtrar por nombre o sesión" autocomplete="off" spellcheck="false">
+        </label>
+        <button id="dex-bag" class="btn ghost" type="button" disabled title="Exportar todos los fragmentos en una bolsa .szb">relevo</button>
       </div>
-      <div id="dex-grid" class="grid"></div>
+      <p class="summary" id="dex-summary"></p>
+      <ol id="dex-list" class="ls" aria-label="Envíos capturados"></ol>
       <div id="dex-empty" class="empty">
-        <div class="empty-art" aria-hidden="true">◎</div>
-        <p><b>Sin capturas todavía</b></p>
-        <p>Escanea QR con la cámara o importa un GIF de códigos.</p>
+        <pre class="empty-art" aria-hidden="true">  ┌─┐┌─┐
+  │▚│ │▞│
+  └─┘└─┘</pre>
+        <p>Aún no hay capturas.</p>
+        <p class="dim">Abre <button class="link" type="button" data-goto="v-scan">scan</button> y apunta a los QR, o importa un GIF de códigos.</p>
       </div>
     </section>
 
-    <!-- CAPTURAR -->
+    <!-- ───────── scan ───────── -->
     <section id="v-scan" class="view" aria-label="Capturar">
-      <div class="scanner" id="scanner">
+      <div class="scan-main">
+      <div id="scanner" class="scanner">
         <video id="cam" playsinline muted hidden></video>
         <div class="reticle" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
-        <div class="scanline" aria-hidden="true"></div>
-        <div class="hud" id="scan-state">Cámara apagada</div>
+        <div id="hud" class="hud" aria-live="off">cámara apagada</div>
+        <div class="scanner-idle" id="scanner-idle">
+          <button id="cam-btn" class="btn primary" type="button">activar cámara</button>
+        </div>
+      </div>
+      <div class="row tools">
+        <button id="cam-stop" class="btn" type="button" hidden>detener</button>
+        <button id="torch-btn" class="btn" type="button" hidden aria-pressed="false">linterna</button>
+        <button id="imp-btn" class="btn" type="button">importar GIF / capturas</button>
+        <input id="imp-input" type="file" accept="image/*" multiple hidden>
       </div>
 
-      <div class="row">
-        <button id="cam-btn" class="primary">Activar cámara</button>
-        <button id="imp-btn">Importar GIF o imagen</button>
+      <div id="drop" class="drop" tabindex="0" role="button" aria-label="Soltar archivos GIF o capturas">
+        suelta aquí GIF, capturas con QR o bolsas .szb <span id="imp-state" class="dim"></span>
       </div>
-      <input id="imp-input" type="file" accept="image/gif,image/png,image/jpeg,image/webp" multiple hidden>
+      </div>
 
-      <div id="drop" class="drop" tabindex="0" role="button">
-        <span class="drop-ico" aria-hidden="true">⤓</span>
-        <span>Arrastra aquí un GIF o capturas de QR</span>
-        <small id="imp-state"></small>
-      </div>
+      <div class="scan-side">
+      <figure class="fmap-box" id="scan-map-box" hidden>
+        <figcaption><span id="scan-map-title"></span><span id="scan-map-count" class="num"></span></figcaption>
+        <canvas id="scan-map" class="fmap" aria-label="Mapa de fragmentos del envío activo"></canvas>
+      </figure>
 
       <details class="paste">
-        <summary>Pegar texto de un fotograma</summary>
-        <textarea id="paste-text" rows="2" spellcheck="false" placeholder="CF3…"></textarea>
-        <button id="paste-btn" class="ghost">Añadir</button>
+        <summary>pegar un fotograma como texto</summary>
+        <textarea id="paste-text" rows="3" spellcheck="false" placeholder="8OAY…"></textarea>
+        <button id="paste-btn" class="btn" type="button">añadir fotograma</button>
       </details>
 
-      <h3 class="sub">Registro</h3>
-      <ol id="log" class="log"></ol>
+      <ol id="log" class="log" aria-label="Registro" aria-live="polite"></ol>
+      </div>
     </section>
 
-    <!-- ENVIAR -->
+    <!-- ───────── send ───────── -->
     <section id="v-send" class="view" aria-label="Enviar">
-      <label id="send-drop" class="drop file">
-        <input id="s-file" type="file" class="sr">
-        <span class="drop-ico" aria-hidden="true">⤒</span>
-        <span id="s-fname">Elige o arrastra un archivo (máx. 8 MB)</span>
-      </label>
-
-      <div class="field">
-        <label for="s-pass">Contraseña <small>mín. 8 caracteres</small></label>
-        <div class="pw">
-          <input id="s-pass" type="password" autocomplete="new-password">
-          <button id="s-eye" class="ghost" type="button">Ver</button>
+      <form id="s-form" class="form" autocomplete="off" onsubmit="return false">
+        <div class="field">
+          <span class="key">archivos</span>
+          <div id="send-drop" class="drop small" tabindex="0" role="button" aria-label="Elegir archivos">
+            <span id="s-fname">elige o suelta archivos · máx. 32 MB en total</span>
+          </div>
+          <input id="s-file" type="file" multiple hidden>
+          <ul id="s-files" class="filelist"></ul>
         </div>
-      </div>
 
-      <div class="field">
-        <span class="label">Tamaño de fotograma</span>
-        <div class="seg" id="s-size" role="radiogroup">
-          <button type="button" data-s="120" role="radio" aria-checked="false">Pequeño</button>
-          <button type="button" data-s="200" role="radio" aria-checked="true" class="on">Normal</button>
-          <button type="button" data-s="300" role="radio" aria-checked="false">Grande</button>
+        <label class="field" for="s-pass">
+          <span class="key">clave</span>
+          <span class="inline">
+            <input id="s-pass" type="password" minlength="8" required placeholder="mínimo 8 caracteres" autocomplete="new-password" spellcheck="false">
+            <button id="s-eye" class="btn ghost" type="button" aria-pressed="false">ver</button>
+          </span>
+        </label>
+
+        <div class="field">
+          <span class="key">qr</span>
+          <div id="s-size" class="seg" role="radiogroup" aria-label="Tamaño de QR"></div>
         </div>
-      </div>
 
-      <button id="s-go" class="primary wide">Preparar envío</button>
-      <p id="s-err" class="err" hidden></p>
+        <div class="field">
+          <span class="key">mosaico</span>
+          <div id="s-mosaic" class="seg" role="radiogroup" aria-label="QR por pantalla">
+            <button type="button" role="radio" data-n="1" aria-checked="false">1</button>
+            <button type="button" role="radio" data-n="2" aria-checked="true" class="on">2</button>
+            <button type="button" role="radio" data-n="4" aria-checked="false">4</button>
+          </div>
+        </div>
+
+        <label class="field check" for="s-webp">
+          <span class="key">fotos</span>
+          <span class="inline"><input id="s-webp" type="checkbox"> recomprimir JPEG/PNG a WebP (con pérdida, mucho menos tiempo)</span>
+        </label>
+
+        <p id="s-est" class="est"></p>
+        <p id="s-err" class="err" role="alert" hidden></p>
+        <button id="s-go" class="btn primary wide" type="button">preparar envío</button>
+      </form>
 
       <div id="s-out" class="out" hidden>
-        <div class="carousel"><canvas id="s-canvas" aria-label="Código QR actual"></canvas></div>
-        <div class="kpis">
+        <div id="s-stage" class="stage">
+          <canvas id="s-canvas" aria-label="Códigos QR del envío"></canvas>
+        </div>
+        <div class="kv">
           <span>bloques <b id="k-k">0</b></span>
-          <span>fotogramas <b id="k-f">0</b></span>
-          <span>tiempo <b id="k-t">0 s</b></span>
+          <span>seed <b id="k-seed">0</b></span>
+          <span>emitido <b id="k-t">0 s</b></span>
+          <span>mínimo <b id="k-min">–</b></span>
         </div>
         <div class="row">
-          <button id="s-play">Pausa</button>
-          <label class="inline">
-            <span id="s-fps-label">6 fps</span>
-            <input id="s-speed" type="range" min="2" max="12" value="6">
-          </label>
+          <button id="s-play" class="btn" type="button">pausa</button>
+          <label class="slider">fps <input id="s-speed" type="range" min="2" max="20" value="8"><b id="s-fps-label">8</b></label>
+          <button id="s-full" class="btn" type="button">pantalla completa</button>
         </div>
         <div class="row">
-          <button id="s-gif" class="primary">Descargar GIF</button>
-          <button id="s-bag">Bolsa .szb</button>
+          <button id="s-gif" class="btn ghost" type="button">GIF</button>
+          <button id="s-bag" class="btn ghost" type="button">bolsa .szb</button>
+          <button id="s-new" class="btn ghost" type="button">nuevo envío</button>
         </div>
+        <p class="dim small" id="s-tip">Mantén la pantalla al máximo brillo. El receptor puede empezar en cualquier momento: cada fotograma nuevo sirve.</p>
       </div>
     </section>
   </main>
 
-  <nav class="dock" aria-label="Navegación">
-    <button class="tab active" data-view="v-dex" aria-selected="true">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/></svg>
-      <span>Pokédex</span>
-    </button>
-    <button class="tab" data-view="v-scan" aria-selected="false">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2"/><circle cx="12" cy="12" r="3"/></svg>
-      <span>Capturar</span>
-    </button>
-    <button class="tab" data-view="v-send" aria-selected="false">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h13M13 6l6 6-6 6"/></svg>
-      <span>Enviar</span>
-    </button>
+  <nav class="tabs" aria-label="Secciones">
+    <button class="tab active" data-view="v-dex" aria-selected="true"><kbd>1</kbd>dex</button>
+    <button class="tab" data-view="v-scan" aria-selected="false"><kbd>2</kbd>scan</button>
+    <button class="tab" data-view="v-send" aria-selected="false"><kbd>3</kbd>send</button>
   </nav>
 
+  <dialog id="detail" aria-labelledby="d-title">
+    <form method="dialog" class="sheet">
+      <header class="sheet-head">
+        <span><b id="d-num"></b> <span id="d-src" class="tag"></span></span>
+        <button class="btn ghost" value="close" aria-label="Cerrar">cerrar</button>
+      </header>
+      <h2 id="d-title"></h2>
+      <p class="mono-id">sesión <code id="d-sid"></code></p>
+      <figure class="fmap-box">
+        <figcaption><span>fragmentos</span><span class="num"><b id="d-solved">0</b>/<b id="d-k">0</b> · <b id="d-frames">0</b> recibidos</span></figcaption>
+        <canvas id="d-map" class="fmap"></canvas>
+      </figure>
+      <p id="d-hint" class="dim"></p>
+      <div id="d-lock" class="lock" hidden>
+        <label for="d-pass" class="key">clave</label>
+        <span class="inline">
+          <input id="d-pass" type="password" autocomplete="off" spellcheck="false">
+          <button id="d-decrypt" class="btn primary" type="button">descifrar</button>
+        </span>
+        <p id="d-err" class="err" role="alert" hidden></p>
+      </div>
+      <div id="d-files" class="files" hidden></div>
+      <div id="d-preview" class="preview"></div>
+      <div class="row end">
+        <button id="d-bag" class="btn ghost" type="button">bolsa .szb</button>
+        <button id="d-del" class="btn danger" type="button">borrar</button>
+      </div>
+    </form>
+  </dialog>
+
   <div id="toast" class="toast" role="status" hidden></div>
-</div>
 
-<dialog id="detail" aria-labelledby="d-title">
-  <article class="sheet">
-    <header class="sheet-head">
-      <span class="grab" aria-hidden="true"></span>
-      <div class="sheet-row">
-        <span id="d-num" class="num">#000</span>
-        <span id="d-src" class="type">QR</span>
-        <form method="dialog"><button class="ghost icon" aria-label="Cerrar">✕</button></form>
-      </div>
-    </header>
-    <h2 id="d-title">Sesión</h2>
-    <code id="d-sid" class="sid"></code>
-
-    <dl class="facts">
-      <div><dt>bloques</dt><dd id="d-k">0</dd></div>
-      <div><dt>recibidos</dt><dd id="d-solved">0</dd></div>
-      <div><dt>fotogramas</dt><dd id="d-frames">0</dd></div>
-    </dl>
-
-    <div class="track big"><i id="d-bar"></i></div>
-    <p id="d-hint" class="hint"></p>
-
-    <div id="d-lock" class="lock" hidden>
-      <div class="pw">
-        <input id="d-pass" type="password" placeholder="Contraseña del envío" autocomplete="off">
-        <button id="d-decrypt" class="primary">Descifrar</button>
-      </div>
-      <p id="d-err" class="err" hidden></p>
-    </div>
-
-    <div id="d-preview" class="preview"></div>
-
-    <div class="row">
-      <button id="d-bag">Bolsa de esta sesión</button>
-      <button id="d-del" class="danger">Borrar</button>
-    </div>
-  </article>
-</dialog>
-
-<script src="vendor/qrcode.bundle.js" defer></script>
-<script type="module" src="js/app.js"></script>
+  <script src="vendor/qrcode.bundle.js" defer></script>
+  <script type="module" src="js/app.js"></script>
 </body>
 </html>

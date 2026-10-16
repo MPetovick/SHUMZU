@@ -1,13 +1,13 @@
 {
   "name": "shumzu",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Transferencia de archivos cifrados por códigos QR y por bolsas de proximidad. Sin servidores.",
   "private": true,
   "type": "module",
   "license": "MIT",
   "scripts": {
-    "test": "node --test test/roundtrip.test.mjs test/gif.test.mjs",
-    "check": "node --check js/app.js && node --check js/visual.js && node --check js/store.js && node --check js/decoder.js && node --check js/scan.js && node --check js/workers/decode.worker.js && node --check sw.js",
+    "test": "node --test test/roundtrip.test.mjs test/gif.test.mjs test/v020.test.mjs",
+    "check": "node --check js/app.js && node --check js/visual.js && node --check js/store.js && node --check js/decoder.js && node --check js/scan.js && node --check js/workers/decode.worker.js && node --check js/workers/multiqr.js && node --check js/core/pack.js && node --check js/core/zip.js && node --check sw.js",
     "start": "python3 -m http.server 8080"
   },
   "engines": {

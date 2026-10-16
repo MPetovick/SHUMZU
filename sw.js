@@ -1,7 +1,7 @@
 // Service worker: la aplicación entera funciona sin red después de la primera visita.
 // Estrategia: caché primero para los recursos propios; cualquier cambio se publica
 // subiendo CACHE_VERSION (los antiguos se borran en activate).
-const CACHE_VERSION = 'shumzu-v0.1.0';
+const CACHE_VERSION = 'shumzu-v0.2.0';
 
 const ASSETS = [
   './',
@@ -13,6 +13,7 @@ const ASSETS = [
   'js/store.js',
   'js/decoder.js',
   'js/workers/decode.worker.js',
+  'js/workers/multiqr.js',
   'js/core/base45.js',
   'js/core/bag.js',
   'js/core/codec.js',
@@ -20,6 +21,8 @@ const ASSETS = [
   'js/core/format.js',
   'js/core/fountain.js',
   'js/core/gif.js',
+  'js/core/pack.js',
+  'js/core/zip.js',
   'js/core/qrgif.js',
   'vendor/qrcode.bundle.js',
   'vendor/jsQR.js',

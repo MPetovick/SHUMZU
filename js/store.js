@@ -1,4 +1,6 @@
 // Persistencia por fotograma en IndexedDB.
+// Claves: v0.1.0 usaba «sid:seed»; v0.2.0 usa «sid.K.S.L:seed» (una entrada por variante).
+// La app migra las claves antiguas al arrancar.
 //
 // v0.0.1a reescribía TODO el lote en localStorage (base64, ~33 % más grande) en cada
 // escaneo. Aquí cada fotograma es una fila; las escrituras se agrupan en una transacción
@@ -75,11 +77,18 @@ export class FrameDB {
   }
 
   loadAll() {
+    return this.loadEntries().then((list) => list.map((e) => e.bytes));
+  }
+
+  // [{ key, bytes }] en una sola transacción (getAllKeys + getAll, mismo orden).
+  loadEntries() {
     return new Promise((resolve, reject) => {
       const tx = this.db.transaction(STORE, 'readonly');
-      const r = tx.objectStore(STORE).getAll();
-      r.onsuccess = () => resolve(r.result.map((v) => new Uint8Array(v)));
-      r.onerror = () => reject(r.error);
+      const os = tx.objectStore(STORE);
+      const rk = os.getAllKeys();
+      const rv = os.getAll();
+      tx.oncomplete = () => resolve(rk.result.map((key, i) => ({ key, bytes: new Uint8Array(rv.result[i]) })));
+      tx.onerror = () => reject(tx.error);
     });
   }
 }

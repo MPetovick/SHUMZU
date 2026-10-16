@@ -116,16 +116,20 @@ export class FountainDecoder {
 
   addSymbol(seed, payload) {
     if (this.complete) return false;
-    const idx = new Set(neighbors(this.K, seed));
+    const nb = neighbors(this.K, seed);
+    // Atajo: si todos los vecinos ya están resueltos, el símbolo no aporta nada y no se copia.
+    let open = 0;
+    for (const i of nb) if (!this.solved[i]) open++;
+    if (open === 0) return false;
+    const idx = new Set(nb);
     const data = Uint8Array.from(payload);
-    for (const i of [...idx]) {
+    for (const i of nb) {
       const s = this.solved[i];
       if (s) {
         xorInto(data, s);
         idx.delete(i);
       }
     }
-    if (idx.size === 0) return false;
     if (idx.size === 1) {
       this._solveFrom({ id: -1, idx, data });
       return true;

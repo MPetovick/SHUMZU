@@ -45,10 +45,19 @@ export function decodeBag(bytes) {
   return frames;
 }
 
-// Almacén de fotogramas recibidos, agrupados por sesión y deduplicados por seed.
+// Identidad de un envío: sesión + K/S/L (ver codec.variantOf; se repite aquí para no
+// crear dependencia circular).
+export const variantKey = (f) => `${toHex(f.session)}.${f.K}.${f.S}.${f.L}`;
+
+// Almacén de fotogramas recibidos, agrupados por variante y deduplicados por seed.
+//
+// 0.0.1a agrupaba solo por sesión y fijaba K/S/L con el PRIMER fotograma visto: un único
+// fotograma malintencionado en una bolsa de relevo (misma sesión, otra L) hacía que todos
+// los legítimos se rechazaran como 'invalid'. Ahora cada variante es independiente.
 export class FrameStore {
   constructor() {
-    this.sessions = new Map(); // sid -> { K, S, L, frames: Map<seed, bytes> }
+    this.sessions = new Map(); // vid -> { sid, K, S, L, frames: Map<seed, bytes> }
+    this.total = 0;
   }
 
   // Devuelve 'new' | 'dup' | 'invalid'. Solo guarda fotogramas bien formados.
@@ -59,36 +68,47 @@ export class FrameStore {
     } catch {
       return 'invalid';
     }
-    const sid = toHex(f.session);
-    let s = this.sessions.get(sid);
+    return this.addParsed(f, bytes).st;
+  }
+
+  // Con el fotograma ya decodificado. Devuelve { st: 'new' | 'dup', vid }.
+  addParsed(f, bytes) {
+    const vid = variantKey(f);
+    let s = this.sessions.get(vid);
     if (!s) {
-      s = { K: f.K, S: f.S, L: f.L, frames: new Map() };
-      this.sessions.set(sid, s);
-    } else if (s.K !== f.K || s.S !== f.S || s.L !== f.L) {
-      return 'invalid';
+      s = { sid: toHex(f.session), K: f.K, S: f.S, L: f.L, frames: new Map() };
+      this.sessions.set(vid, s);
     }
-    if (s.frames.has(f.seed)) return 'dup';
+    if (s.frames.has(f.seed)) return { st: 'dup', vid };
     s.frames.set(f.seed, bytes.slice());
-    return 'new';
+    this.total++;
+    return { st: 'new', vid };
   }
 
-  remove(sid) {
-    return this.sessions.delete(sid);
+  remove(vid) {
+    const s = this.sessions.get(vid);
+    if (s) this.total -= s.frames.size;
+    return this.sessions.delete(vid);
   }
 
-  count(sid) {
-    const s = this.sessions.get(sid);
+  count(vid) {
+    const s = this.sessions.get(vid);
     return s ? s.frames.size : 0;
   }
 
-  framesOf(sid) {
-    const s = this.sessions.get(sid);
+  seedsOf(vid) {
+    const s = this.sessions.get(vid);
+    return s ? [...s.frames.keys()] : [];
+  }
+
+  framesOf(vid) {
+    const s = this.sessions.get(vid);
     return s ? [...s.frames.values()] : [];
   }
 
   allFrames() {
     const out = [];
-    for (const s of this.sessions.values()) out.push(...s.frames.values());
+    for (const s of this.sessions.values()) for (const f of s.frames.values()) out.push(f);
     return out;
   }
 }
