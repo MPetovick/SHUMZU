@@ -74,10 +74,19 @@
 
     <fieldset class="seg-group">
       <legend data-i18n="speed"></legend>
-      <div class="seg" id="seg-mode">
-        <button data-v="lento"><b data-i18n="mLento"></b><span data-i18n="mLentoSub"></span></button>
-        <button data-v="base"><b data-i18n="mBase"></b><span data-i18n="mBaseSub"></span></button>
+      <div class="seg four" id="seg-mode">
+        <button data-v="matriz" class="star"><b data-i18n="mMatriz"></b><span data-i18n="mMatrizSub"></span></button>
         <button data-v="turbo"><b data-i18n="mTurbo"></b><span data-i18n="mTurboSub"></span></button>
+        <button data-v="base"><b data-i18n="mBase"></b><span data-i18n="mBaseSub"></span></button>
+        <button data-v="lento"><b data-i18n="mLento"></b><span data-i18n="mLentoSub"></span></button>
+      </div>
+      <div id="matrix-opts" class="matrix-opts" hidden>
+        <div class="seg" id="seg-density">
+          <button data-v="segura"><b data-i18n="dSegura"></b><span data-i18n="dSeguraSub"></span></button>
+          <button data-v="rapida"><b data-i18n="dRapida"></b><span data-i18n="dRapidaSub"></span></button>
+          <button data-v="maxima"><b data-i18n="dMaxima"></b><span data-i18n="dMaximaSub"></span></button>
+        </div>
+        <label class="check"><input type="checkbox" id="gray4"><span><b data-i18n="gray4"></b> <span class="muted" data-i18n="gray4Sub"></span></span></label>
       </div>
     </fieldset>
     <fieldset class="seg-group">

@@ -1,6 +1,6 @@
 /* SHUMZU · service worker: todo en caché para funcionar sin conexión; avisa de versiones nuevas. */
-const VERSION = 'shumzu-0.0.1-436cc3901f';
-const FILES = ["./","icons/apple-touch-icon.png","icons/icon-192.png","icons/icon-512.png","icons/icon-maskable-512.png","icons/icon.svg","index.html","js/app.js","js/emit.worker.js","js/join.worker.js","js/scan.worker.js","manifest.webmanifest","styles.css","view.html","wasm/raptorq_bg.wasm","wasm/zxing_reader.wasm"];
+const VERSION = 'shumzu-0.0.2-f03fde8eb5';
+const FILES = ["./","icons/apple-touch-icon.png","icons/icon-192.png","icons/icon-512.png","icons/icon-maskable-512.png","icons/icon.svg","index.html","js/app.js","js/emit.worker.js","js/join.worker.js","js/matrix.worker.js","js/scan.worker.js","manifest.webmanifest","styles.css","view.html","wasm/raptorq_bg.wasm","wasm/zxing_reader.wasm"];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(VERSION).then((c) => c.addAll(FILES)));

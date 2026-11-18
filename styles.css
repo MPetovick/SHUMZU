@@ -179,3 +179,12 @@ dialog .row { margin-top: 14px; }
   .hero { padding-top: 4vh; }
   main { padding: 4px 14px 32px; }
 }
+
+/* 0.0.2 · matriz */
+.seg.four { grid-template-columns: repeat(4, 1fr); }
+.seg button.star b::after { content: ' ◆'; color: var(--accent); font-size: 11px; }
+.matrix-opts { margin-top: 10px; padding: 12px; border: 1px solid var(--line); border-radius: var(--r); background: #0d1116; }
+.check { display: flex; gap: 10px; align-items: flex-start; margin-top: 10px; font-size: 14px; cursor: pointer; }
+.check input { margin-top: 3px; accent-color: var(--accent); width: 16px; height: 16px; }
+.cam.locked .guide i { border-color: var(--ok); }
+@media (max-width: 560px) { .seg.four { grid-template-columns: 1fr 1fr; } .seg.four button { flex-direction: column; align-items: flex-start; } }
