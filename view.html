@@ -1,0 +1,21 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; media-src data: blob:; font-src data:; form-action 'none'; base-uri 'none'">
+<meta name="referrer" content="no-referrer">
+<title>SHUMZU</title></head>
+<body><script>
+/* SHUMZU · visor de cápsulas. Se carga en un iframe con sandbox="allow-scripts" (sin allow-same-origin):
+ * origen opaco, sin acceso a SHUMZU, y esta CSP impide cualquier petición de red.
+ * Recibe el HTML una sola vez del padre y lo escribe en este mismo documento, que conserva la CSP. */
+(function () {
+  var done = false;
+  addEventListener('message', function (e) {
+    if (done || e.source !== parent || !e.data || typeof e.data.html !== 'string') return;
+    done = true;
+    document.open();
+    document.write(e.data.html);
+    document.close();
+  });
+  parent.postMessage({ shumzuView: 'ready' }, '*');
+})();
+</script></body></html>

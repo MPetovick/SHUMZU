@@ -1,100 +1,187 @@
 <!doctype html>
-<html lang="es">
+<html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <meta name="theme-color" content="#1f2a2e" />
-  <meta name="description" content="Estrategia por casillas para dos jugadores con órdenes simultáneas." />
-  <title>Sembrado</title>
-  <link rel="manifest" href="manifest.webmanifest" />
-  <link rel="icon" href="icons/icon-192.png" />
-  <link rel="apple-touch-icon" href="icons/icon-192.png" />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Semi+Condensed:wght@500;600;700&display=swap" />
-  <link rel="stylesheet" href="src/ui/styles.css" />
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; worker-src 'self'; connect-src 'self'; img-src 'self' blob: data:; media-src 'self' blob:; style-src 'self' 'unsafe-inline'; frame-src 'self' blob:; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="no-referrer">
+<title>SHUMZU · files through light</title>
+<meta name="description" content="Pass files between devices through light: animated QR, no internet, no account, no cable. A beta project by MPe Software.">
+<meta name="theme-color" content="#0B0C0E">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <!-- Home -->
-  <section id="screen-home" class="screen home active" aria-label="Inicio">
-    <header>
-      <h1>Sembrado</h1>
-      <p class="lede">Conquista el tablero antes que tu rival. Los dos ordenáis a la vez y en secreto.</p>
-    </header>
+<header class="top">
+  <a class="brand" href="#/" aria-label="SHUMZU">
+    <span class="mark" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+    <span class="word">SHUMZU</span>
+    <span class="tag">beta</span>
+  </a>
+  <nav class="langs" aria-label="Language">
+    <button data-lang="en">EN</button><button data-lang="es">ES</button><button data-lang="ca">CAT</button>
+  </nav>
+</header>
 
-    <figure style="margin:0">
-      <div class="clash" aria-hidden="true">
-        <div class="tile mine"><span class="chip inf">♜&#xFE0E;</span></div>
-        <div class="tile black"></div>
-        <div class="tile foe"><span class="chip inf">♜&#xFE0E;</span></div>
-      </div>
-      <figcaption class="clash-caption">Si los dos enviáis la misma unidad a la misma casilla, se quema y nadie podrá tomarla.</figcaption>
-    </figure>
-
-    <nav class="menu" aria-label="Modos de juego">
-      <button id="btn-continue" class="btn primary" hidden>Continuar partida</button>
-      <div class="seg" role="group" aria-label="Dificultad del bot">
-        <button data-level="facil" aria-pressed="false">Fácil</button>
-        <button data-level="normal" aria-pressed="true">Normal</button>
-      </div>
-      <button id="btn-bot" class="btn primary">Jugar contra el bot</button>
-      <div class="row2">
-        <button id="btn-host" class="btn">Crear sala</button>
-        <button id="btn-join" class="btn">Unirse</button>
-      </div>
-      <button id="btn-rules" class="btn quiet">Cómo se juega</button>
-      <button id="btn-install" class="btn quiet" hidden>Instalar en el móvil</button>
-    </nav>
-
-    <footer>Versión <span id="version"></span>. PvP directo entre móviles con WebRTC.</footer>
+<main>
+  <!-- inicio -->
+  <section id="v-home" class="view" hidden>
+    <div class="hero">
+      <p class="kicker" data-i18n="kicker"></p>
+      <h1 data-i18n="heroTitle"></h1>
+      <p class="lead" data-i18n="heroLead"></p>
+    </div>
+    <div class="choices">
+      <a class="choice" href="#/send">
+        <span class="ico" aria-hidden="true">▣ →</span>
+        <b data-i18n="send"></b>
+        <span data-i18n="sendSub"></span>
+      </a>
+      <a class="choice" href="#/receive">
+        <span class="ico" aria-hidden="true">→ ◉</span>
+        <b data-i18n="receive"></b>
+        <span data-i18n="receiveSub"></span>
+      </a>
+    </div>
+    <ul class="facts">
+      <li data-i18n="fact1"></li><li data-i18n="fact2"></li><li data-i18n="fact3"></li><li data-i18n="fact4"></li>
+    </ul>
   </section>
 
-  <!-- Game -->
-  <section id="screen-game" class="screen game" aria-label="Partida">
-    <div class="topbar">
-      <button id="btn-menu" class="icon-btn" aria-label="Menú de partida">☰</button>
-      <div class="round num" id="round-label"></div>
-      <div class="phase" id="phase" data-phase="plan" role="status">
-        <span class="dot"></span><span id="phase-text">Planifica</span><span class="timer" id="timer"></span>
-      </div>
-      <button id="btn-help" class="icon-btn" aria-label="Leyenda y reglas">?</button>
-    </div>
-
-    <div class="player foe">
-      <span class="swatch" aria-hidden="true"></span>
-      <div class="who"><span class="name" id="foe-name">Rival</span><span class="sub" id="foe-status"></span></div>
-      <div class="cells"><b class="num" id="cells-foe">0</b><span class="sub" id="share-foe"></span></div>
-    </div>
-
-    <div class="board" id="board" role="grid" aria-label="Tablero"></div>
-
-    <div class="player me">
-      <span class="swatch" aria-hidden="true"></span>
-      <div class="who"><span class="name">Tú</span><span class="sub" id="me-income"></span></div>
-      <div class="cells"><b class="num" id="cells-me">0</b><span class="sub" id="share-me"></span></div>
-    </div>
-
-    <div class="orders-wrap"><ol class="orders" id="orders" aria-label="Tus órdenes de esta ronda"></ol></div>
-
-    <div class="dock">
-      <div class="hint" id="hint" aria-live="polite"></div>
-      <div class="tray" id="tray" role="toolbar" aria-label="Unidades y edificios"></div>
-      <div class="actions">
-        <div class="pips" id="pips" aria-label="Acciones usadas"></div>
-        <button id="btn-confirm" class="btn primary">Confirmar jugada</button>
+  <!-- enviar -->
+  <section id="v-send" class="view" hidden>
+    <h2 data-i18n="sendTitle"></h2>
+    <div id="drop" class="drop" tabindex="0">
+      <input id="file" type="file" hidden>
+      <p class="drop-main" data-i18n="dropMain"></p>
+      <p class="drop-sub" data-i18n="dropSub"></p>
+      <div class="row">
+        <button id="pick" class="btn" data-i18n="pick"></button>
+        <button id="totext" class="btn ghost" data-i18n="writeText"></button>
       </div>
     </div>
+    <div id="textbox" class="textbox" hidden>
+      <textarea id="text" rows="6" maxlength="200000"></textarea>
+      <div class="row"><span class="muted" id="textcount"></span><button id="textok" class="btn" data-i18n="useText"></button></div>
+    </div>
+    <div id="item" class="item" hidden>
+      <span class="item-ico" id="item-ico">▤</span>
+      <div class="item-meta"><b id="item-name"></b><span id="item-info" class="muted"></span></div>
+      <button id="item-x" class="x" aria-label="×">×</button>
+    </div>
+
+    <fieldset class="seg-group">
+      <legend data-i18n="speed"></legend>
+      <div class="seg" id="seg-mode">
+        <button data-v="lento"><b data-i18n="mLento"></b><span data-i18n="mLentoSub"></span></button>
+        <button data-v="base"><b data-i18n="mBase"></b><span data-i18n="mBaseSub"></span></button>
+        <button data-v="turbo"><b data-i18n="mTurbo"></b><span data-i18n="mTurboSub"></span></button>
+      </div>
+    </fieldset>
+    <fieldset class="seg-group">
+      <legend data-i18n="protection"></legend>
+      <div class="seg" id="seg-lock">
+        <button data-v="none"><b data-i18n="lNone"></b><span data-i18n="lNoneSub"></span></button>
+        <button data-v="pass"><b data-i18n="lPass"></b><span data-i18n="lPassSub"></span></button>
+        <button data-v="light"><b data-i18n="lLight"></b><span data-i18n="lLightSub"></span></button>
+      </div>
+    </fieldset>
+    <p id="estimate" class="estimate"></p>
+    <button id="go" class="btn primary wide" data-i18n="emit" disabled></button>
   </section>
 
-  <div class="scrim" id="scrim"></div>
-  <div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-title">
-    <div class="grab"></div>
-    <div id="sheet-body"></div>
+  <!-- recibir -->
+  <section id="v-recv" class="view" hidden>
+    <div id="cam" class="cam">
+      <video id="video" playsinline muted autoplay></video>
+      <div class="guide" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+      <div id="cam-msg" class="cam-msg"></div>
+      <div class="cam-tools">
+        <button id="cam-flip" class="chip" data-i18n="flip" hidden></button>
+        <button id="hs-open" class="chip" data-i18n="lightBtn"></button>
+      </div>
+    </div>
+    <div class="meter">
+      <div class="bar"><i id="bar"></i></div>
+      <div class="stats">
+        <span id="st-main" data-i18n="searching"></span>
+        <span id="st-side" class="muted"></span>
+      </div>
+      <p id="st-hint" class="muted small" data-i18n="recvHint"></p>
+    </div>
+    <div id="fp-recv" class="fp" hidden></div>
+    <div id="result" class="result" hidden></div>
+  </section>
+
+  <!-- información -->
+  <section id="v-info" class="view prose" hidden></section>
+</main>
+
+<footer class="foot">
+  <span>SHUMZU <span id="ver"></span> · <a href="#/info" data-i18n="how"></a></span>
+  <span><span data-i18n="byMpe"></span> <a href="https://www.mpe.software" rel="noopener">MPe Software</a></span>
+</footer>
+
+<!-- emisión a pantalla completa -->
+<div id="emit" class="overlay emit" hidden>
+  <div class="emit-top">
+    <div class="emit-file"><b id="e-name"></b><span id="e-info" class="muted"></span></div>
+    <button id="e-close" class="x" aria-label="×">×</button>
   </div>
-  <div class="toast" id="toast" role="status"></div>
+  <div id="e-secret" class="emit-secret" hidden></div>
+  <div class="emit-stage" id="e-stage"><canvas id="e-canvas"></canvas><div id="e-wait" class="emit-wait" data-i18n="preparing"></div></div>
+  <div class="emit-bottom">
+    <div class="bar thin"><i id="e-bar"></i></div>
+    <div class="emit-ctrl">
+      <span id="e-pass" class="muted"></span>
+      <div class="fps"><button id="e-slow" aria-label="−">−</button><span id="e-fps"></span><button id="e-fast" aria-label="+">+</button></div>
+      <button id="e-pause" class="chip" data-i18n="pause"></button>
+    </div>
+    <p class="muted small center" id="e-hint"></p>
+  </div>
+</div>
 
-  <!-- A single classic script so the game also works when index.html is opened by double-click (file://).
-       Generated from src/ with `npm run build`. -->
-  <script src="app.bundle.js"></script>
+<!-- emisor: leer el saludo de luz del receptor -->
+<div id="hsscan" class="overlay" hidden>
+  <div class="panel">
+    <div class="panel-top"><b data-i18n="hsScanTitle"></b><button id="hs-x" class="x" aria-label="×">×</button></div>
+    <p class="muted" data-i18n="hsScanText"></p>
+    <div class="cam small"><video id="hs-video" playsinline muted autoplay></video><div class="guide" aria-hidden="true"><i></i><i></i><i></i><i></i></div></div>
+    <div class="row"><button id="hs-flip" class="chip" data-i18n="flip"></button></div>
+  </div>
+</div>
+
+<!-- receptor: mostrar su saludo de luz -->
+<div id="hsshow" class="overlay" hidden>
+  <div class="panel">
+    <div class="panel-top"><b data-i18n="hsShowTitle"></b><button id="hs-close" class="x" aria-label="×">×</button></div>
+    <p class="muted" data-i18n="hsShowText"></p>
+    <div class="qr-white"><canvas id="hs-canvas"></canvas></div>
+    <button id="hs-done" class="btn primary wide" data-i18n="hsDone"></button>
+  </div>
+</div>
+
+<!-- visor aislado -->
+<div id="viewer" class="overlay viewer" hidden>
+  <div class="viewer-top">
+    <div><b id="vw-name"></b> <span id="vw-mode" class="badge"></span></div>
+    <button id="vw-x" class="x" aria-label="×">×</button>
+  </div>
+  <div id="vw-body" class="viewer-body"></div>
+</div>
+
+<dialog id="ask"><form method="dialog" id="ask-form">
+  <p id="ask-text"></p>
+  <input id="ask-input" autocomplete="off" autocapitalize="characters" spellcheck="false" hidden>
+  <p id="ask-err" class="err" hidden></p>
+  <div class="row end"><button value="no" class="btn ghost" id="ask-no"></button><button value="yes" class="btn primary" id="ask-yes"></button></div>
+</form></dialog>
+
+<div id="toast" class="toast" role="status" hidden></div>
+<div id="update" class="update" hidden><span data-i18n="updateText"></span><button id="update-go" class="chip" data-i18n="updateBtn"></button></div>
+
+<script type="module" src="js/app.js"></script>
 </body>
 </html>
